@@ -7,7 +7,7 @@ if [ $? != 0 ]
 then
         echo ""
         echo "No network connection found"
-        python3 wifi-config.py &
+	python3 /home/pi/Documents/raspberry-capture-kit/startup-scripts/wifi-config.py &
         wifi-connect --portal-ssid="$WIFI_CONFIG_SSID" --portal-passphrase="$WIFI_CONFIG_PASSWD"
 else
         echo ""
