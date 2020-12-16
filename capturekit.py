@@ -14,6 +14,7 @@ import platform
 import asyncio
 import netifaces
 import requests
+from timeit import default_timer as timer
 
 from threading import Thread
 
@@ -169,6 +170,7 @@ class WebSocketServer(object):
                         socketio.emit("status", status)
                 except:
                     pass   
+
             socketio.sleep(0.1)
 
 def Status():

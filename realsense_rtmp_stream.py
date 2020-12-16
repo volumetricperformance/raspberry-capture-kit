@@ -12,6 +12,7 @@ import time
 import sys
 import platform
 import asyncio
+from timeit import default_timer as timer
 
 import multiprocessing.queues as mpq
 from multiprocessing import Process, SimpleQueue
@@ -193,7 +194,7 @@ class RealsenseCapture (mp.Process):
                     appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
                     videoconvert !  omxh264enc ! video/x-h264 ! h264parse ! video/x-h264 ! \
                     queue max-size-buffers=0 max-size-bytes=0 max-size-time=180000000 min-threshold-buffers=1 leaky=upstream ! mux. \
-                    alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 !  audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
+                    alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
                     queue max-size-buffers=0 max-size-bytes=0 max-size-time=4000000000 min-threshold-buffers=1 ! mux.'
 
             elif platform.system() == "Darwin":
@@ -227,7 +228,10 @@ class RealsenseCapture (mp.Process):
                 # ======================================
                 # 7. Wait for a coherent pair of frames:
                 # ======================================
+                start = timer()
                 frames = self.rspipeline.wait_for_frames(1000)
+                waitFrameTime = timer()
+                print(str(waitFrameTime-start) + " Wait frame time")
 
                 # =======================================
                 # 8. Align the depth frame to color frame
@@ -304,27 +308,42 @@ class RealsenseCapture (mp.Process):
 
                 # push to gstreamer
                 frame = images.tostring()
+                #start = timer()
                 buf = Gst.Buffer.new_allocate(None, len(frame), None)
+                #buffAllocationTime = timer()
+                #print(str(buffAllocationTime-start) + " buffer allocation time")
                 buf.fill(0,frame)
+                #start = timer()
                 appsrc.emit("push-buffer", buf)
+                #emitTime = timer()
+                #print(str(emitTime-start) + " push stream")
 
                 #process any messages from gstreamer
+                #start = timer()
                 msg = bus.pop_filtered(
                     Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                 )
+                #msgprocesstime = timer()
+                #print(str(msgprocesstime-start) + " gstreamer process time")
                 #empty the message queue if there is one
+                #start = timer()
                 while( msg ): 
                     self.on_bus_message(msg)
                     msg = bus.pop_filtered(
                         Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                     )
 
+                #msgprocesstime = timer()
+                #print(str(msgprocesstime-start) + " gstreamer message queue time")
                 #preview side by side because of landscape orientation of the pi
                 preview = np.hstack((color_image, hsv8))
 
                 #if we don't check for exit here the shutdown process hangs here
-                if(not self.exit.is_set()):
-                    self.previewQueue.put(preview)
+                #start = timer()
+                #if(not self.exit.is_set()):
+                    #self.previewQueue.put(preview)
+                opencvWindowTimer = timer()
+                print(str(opencvWindowTimer - start) + " opencv window time")
 
         except:        
             e = sys.exc_info()[0]

@@ -4,10 +4,15 @@
 ###############################################
 ##      Open CV and Numpy integration        ##
 ###############################################
+try:
+        import pyrealsense2.pyrealsense2 as rs
+except ModuleNotFoundError:
+        print('Use local realsense lib')
+        import pyrealsense2 as rs
 
-import pyrealsense2 as rs
 import numpy as np
 import cv2
+from timeit import default_timer as timer
 
 # Configure depth and color streams
 pipeline = rs.pipeline()
@@ -23,9 +28,12 @@ align = rs.align(align_to)
 
 try:
     while True:
-
+        start = timer()
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
+        #frameWait = timer ()
+        #frameWaitTime = frameWait - start
+        #print(str(frameWaitTime) + " frame wait time")
         # Align the depth frame to color frame
         aligned_frames = align.process(frames)
 
@@ -34,9 +42,16 @@ try:
         if not depth_frame or not color_frame:
             continue
 
+        #syncedFrame = timer()
+        #syncedFrameTime = syncedFrame - start
+        #print(str(syncedFrameTime) + " synced time")
+
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
+        #frameToNp = timer()
+        #frameToNpTime = frameToNp - start
+        #print(str(frameToNpTime) + " numpy array time")
 
         # We need to encode/pack the 16bit depth value to RGB
         # we do this by treating it as the Hue in HSV. 
@@ -48,15 +63,17 @@ try:
         clipped = depth_image > 4000
         depth_image[clipped] = 0
 
+        start = timer()
         # Now normalize using that far plane
         # cv expects the H in degrees, not 0-1 :(
         depth_image_norm = (depth_image * (360/4000)).astype( np.float32)
         
         # Create 3 dimensional HSV array where H=depth, S=1, V=1
         depth_hsv = np.concatenate([depth_image_norm[..., np.newaxis]]*3, axis=2)
-        #depth_hsv[:,:,0] = 1
+        depth_hsv[:,:,0] = 1
         depth_hsv[:,:,1] = 1
         depth_hsv[:,:,2] = 1
+
 
         discard = depth_image_norm == 0
         s = depth_hsv[:,:,1]
@@ -67,9 +84,11 @@ try:
         # cv2.cvtColor to convert HSV to RGB
         # problem is that cv2 expects hsv to 8bit (0-255)
         hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
+        hsvTime = timer()
+        print(str(hsvTime-start) + " hsv conversion time")
 
         # Stack both images horizontally
-    
+        #start = timer()
         color32 = (color_image/256).astype( np.float32)
         images = np.vstack((color32, hsv))
 
@@ -81,6 +100,8 @@ try:
         cv2.moveWindow("RealSense", 0,0)
         cv2.imshow('RealSense', images)
         cv2.waitKey(1)
+        #windowTime = timer()
+        #print(str(windowTime-start) + " opencv window time")
 
 finally:
 
