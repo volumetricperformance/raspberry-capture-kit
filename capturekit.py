@@ -205,7 +205,7 @@ def main():
     global statusQueue
 
     #queue of images
-    previewQueue = SimpleQueue()
+    previewQueue = Queue()
     #queue of status messages
     statusQueue = SimpleQueue()
 

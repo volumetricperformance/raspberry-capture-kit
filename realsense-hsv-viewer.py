@@ -20,6 +20,10 @@ config = rs.config()
 config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
+colorizer = rs.colorizer()
+colorizer.set_option(rs.option.color_scheme, 0)
+
+
 # Start streaming
 pipeline.start(config)
 
@@ -47,7 +51,8 @@ try:
         #print(str(syncedFrameTime) + " synced time")
 
         # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())
+        #depth_image = np.asanyarray(depth_frame.get_data())
+        depth_image = np.asanyarray(colorizer.colorize(depth_frame).get_data()) #intel realsense colorizer
         color_image = np.asanyarray(color_frame.get_data())
         #frameToNp = timer()
         #frameToNpTime = frameToNp - start
@@ -60,37 +65,50 @@ try:
         # HSV elements are in the 0-1 range so we need to normalize the depth array to 0-1
         # First set a far plane and set everything beyond that to 0
         
+        #start = timer()
         clipped = depth_image > 4000
         depth_image[clipped] = 0
+        #hsvTimer = timer()
+        #print(str(hsvTimer - start) + " clip")
 
-        start = timer()
         # Now normalize using that far plane
         # cv expects the H in degrees, not 0-1 :(
-        depth_image_norm = (depth_image * (360/4000)).astype( np.float32)
-        
+        #start = timer()
+        #depth_image_norm = (depth_image * (360/4000)).astype( np.float32)
+        #hsvTimer = timer()
+        #print(str(hsvTimer - start) + " depth_image_norm")
+
         # Create 3 dimensional HSV array where H=depth, S=1, V=1
-        depth_hsv = np.concatenate([depth_image_norm[..., np.newaxis]]*3, axis=2)
-        depth_hsv[:,:,0] = 1
-        depth_hsv[:,:,1] = 1
-        depth_hsv[:,:,2] = 1
+        #start = timer()
+        #depth_hsv = np.concatenate([depth_image_norm[..., np.newaxis]]*3, axis=2)
+        #depth_hsv[:,:,0:2] = 1
+        #depth_hsv[:,:,1] = 1
+        #depth_hsv[:,:,2] = 1
+        #hsvTimer = timer()
+        #print(str(hsvTimer - start) + " depth_concat")
 
 
-        discard = depth_image_norm == 0
-        s = depth_hsv[:,:,1]
-        v = depth_hsv[:,:,2] 
-        s[ discard] = 0
-        v[ discard] = 0
+        #start = timer()
+        #discard = depth_image_norm == 0
+        #s = depth_hsv[:,:,1]
+        #v = depth_hsv[:,:,2] 
+        #s[ discard] = 0
+        #v[ discard] = 0
+        #hsvTimer = timer()
+        #print(str(hsvTimer - start) + " s v discard")
 
         # cv2.cvtColor to convert HSV to RGB
         # problem is that cv2 expects hsv to 8bit (0-255)
-        hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
-        hsvTime = timer()
-        print(str(hsvTime-start) + " hsv conversion time")
+        #start = timer()
+        #hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
+        #hsvTime = timer()
+        #print(str(hsvTime-start) + " hsv conversion time")
 
         # Stack both images horizontally
         #start = timer()
         color32 = (color_image/256).astype( np.float32)
-        images = np.vstack((color32, hsv))
+        images = np.vstack((color32, depth_image)) # intel hsv
+        #images = np.vstack((color32, hsv))
 
 
         # ffplay -f avfoundation -i "2:0" -vf  "crop=1024:768:400:800" -pix_fmt yuv420p -y 
@@ -100,8 +118,8 @@ try:
         cv2.moveWindow("RealSense", 0,0)
         cv2.imshow('RealSense', images)
         cv2.waitKey(1)
-        #windowTime = timer()
-        #print(str(windowTime-start) + " opencv window time")
+        windowTime = timer()
+        print(str(windowTime-start) + " opencv window time")
 
 finally:
 

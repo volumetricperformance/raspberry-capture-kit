@@ -15,7 +15,7 @@ import asyncio
 from timeit import default_timer as timer
 
 import multiprocessing.queues as mpq
-from multiprocessing import Process, SimpleQueue
+from multiprocessing import Process, Queue
 import multiprocessing as mp
 
 from flask import Flask, Response, render_template, send_from_directory
@@ -192,9 +192,9 @@ class RealsenseCapture (mp.Process):
                 
                 CLI='flvmux name=mux streamable=true latency=3000000000 ! rtmpsink location="'+  self.rtmp_url +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
                     appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
-                    videoconvert !  omxh264enc ! video/x-h264 ! h264parse ! video/x-h264 ! \
+                    videoconvert !  omxh264enc ! h264parse ! video/x-h264 ! \
                     queue max-size-buffers=0 max-size-bytes=0 max-size-time=180000000 min-threshold-buffers=1 leaky=upstream ! mux. \
-                    alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
+                    alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 ! aacparse ! audio/mpeg, mpegversion=4 ! \
                     queue max-size-buffers=0 max-size-bytes=0 max-size-time=4000000000 min-threshold-buffers=1 ! mux.'
 
             elif platform.system() == "Darwin":
@@ -230,8 +230,8 @@ class RealsenseCapture (mp.Process):
                 # ======================================
                 start = timer()
                 frames = self.rspipeline.wait_for_frames(1000)
-                waitFrameTime = timer()
-                print(str(waitFrameTime-start) + " Wait frame time")
+                #waitFrameTime = timer()
+                #print(str(waitFrameTime-start) + " Wait frame time")
 
                 # =======================================
                 # 8. Align the depth frame to color frame
@@ -335,13 +335,12 @@ class RealsenseCapture (mp.Process):
 
                 #msgprocesstime = timer()
                 #print(str(msgprocesstime-start) + " gstreamer message queue time")
-                #preview side by side because of landscape orientation of the pi
-                preview = np.hstack((color_image, hsv8))
+                #preview side by side because of landscape orientation of the pi 
 
                 #if we don't check for exit here the shutdown process hangs here
                 #start = timer()
-                #if(not self.exit.is_set()):
-                    #self.previewQueue.put(preview)
+                if(not self.exit.is_set()):
+                    self.previewQueue.put_nowait(np.hstack((color_image, hsv8)))
                 opencvWindowTimer = timer()
                 print(str(opencvWindowTimer - start) + " opencv window time")
 
