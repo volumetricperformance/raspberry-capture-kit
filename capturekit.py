@@ -126,10 +126,23 @@ def handle_reboot():
     except:
         pass
 
-    print('Shutdown Complete') 
-
     if platform.system() == "Linux":
         os.system('systemctl reboot -i')
+
+
+@socketio.on('shutdown')
+def handle_shutdown():
+    global running
+    
+    print('Shutdown')  
+    running = False
+    try:
+        socketio.stop()
+    except:
+        pass
+
+    if platform.system() == "Linux":
+        os.system('systemctl shutdown -i')        
 
 #TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
 @app.route('/shutdown')
@@ -137,13 +150,12 @@ def quit():
     global running
     running = False
 
+    print('Shutdown')
     try:
         socketio.stop()
     except:
         pass
-    
-    return ('', 204)
-
+  
 class WebSocketServer(object):
     def __init__(self):
         self.thread = None

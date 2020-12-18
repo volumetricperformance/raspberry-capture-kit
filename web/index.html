@@ -62,6 +62,9 @@
       function reboot(){
         socket.emit('reboot');
       }
+      function shutdown(){
+        socket.emit('shutdown');
+      }
 
       function update(){
         socket.emit('update');
@@ -86,7 +89,7 @@
     <div class="row">
       <button onClick="reboot()">Restart</button>
       <div style="display:inline-block;width:30px"></div>      
-      <!-- <button onClick="update()">Update</button> -->
+      <button onClick="shutdown()">Shutdown</button>
     </div>
   </div>
 </body>
