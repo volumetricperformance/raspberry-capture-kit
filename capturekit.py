@@ -142,7 +142,7 @@ def handle_shutdown():
         pass
 
     if platform.system() == "Linux":
-        os.system('systemctl shutdown -i')        
+        os.system('systemctl poweroff -i')        
 
 #TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
 @app.route('/shutdown')
