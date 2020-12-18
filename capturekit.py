@@ -14,6 +14,7 @@ import platform
 import asyncio
 import netifaces
 import requests
+from timeit import default_timer as timer
 
 from threading import Thread
 
@@ -125,10 +126,23 @@ def handle_reboot():
     except:
         pass
 
-    print('Shutdown Complete') 
-
     if platform.system() == "Linux":
         os.system('systemctl reboot -i')
+
+
+@socketio.on('shutdown')
+def handle_shutdown():
+    global running
+    
+    print('Shutdown')  
+    running = False
+    try:
+        socketio.stop()
+    except:
+        pass
+
+    if platform.system() == "Linux":
+        os.system('systemctl poweroff -i')        
 
 #TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
 @app.route('/shutdown')
@@ -136,13 +150,12 @@ def quit():
     global running
     running = False
 
+    print('Shutdown')
     try:
         socketio.stop()
     except:
         pass
-    
-    return ('', 204)
-
+  
 class WebSocketServer(object):
     def __init__(self):
         self.thread = None
@@ -169,6 +182,7 @@ class WebSocketServer(object):
                         socketio.emit("status", status)
                 except:
                     pass   
+
             socketio.sleep(0.1)
 
 def Status():
@@ -203,7 +217,7 @@ def main():
     global statusQueue
 
     #queue of images
-    previewQueue = SimpleQueue()
+    previewQueue = Queue()
     #queue of status messages
     statusQueue = SimpleQueue()
 
