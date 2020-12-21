@@ -189,7 +189,7 @@ def Status():
     result = None
     try:
         if( not statusQueue.empty() ):
-            result = statusQueue.get()
+            result = statusQueue.get_nowait()
     except queue.Empty:
         pass
 
@@ -200,7 +200,7 @@ def LastPreview():
 
     try:
         while( not previewQueue.empty() ):
-            result = previewQueue.get()
+            result = previewQueue.get_nowait()
     except queue.Empty:
         pass
 
@@ -219,7 +219,7 @@ def main():
     #queue of images
     previewQueue = Queue()
     #queue of status messages
-    statusQueue = SimpleQueue()
+    statusQueue = Queue()
 
 
     try:
