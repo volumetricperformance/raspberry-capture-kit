@@ -12,13 +12,9 @@ import multiprocessing.queues as mpq
 from multiprocessing import Process, Queue
 import multiprocessing as mp
 
-from flask import Flask, Response, render_template, send_from_directory
-from flask_socketio import SocketIO, emit
-
 import gi
 gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
-import traceback
 
 class GStreamerSender(mp.Process):
     def __init__(self, rtmp_url, width, height, statusQueue, messageQueue):

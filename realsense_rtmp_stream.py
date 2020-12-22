@@ -254,7 +254,11 @@ class RealsenseCapture (mp.Process):
                 #if we don't check for exit here the shutdown process hangs here
                 #start = timer()
                 if(not self.exit.is_set()):
-                    self.previewQueue.put_nowait((color_image, hsv8))
+                    try:
+                        if(not self.previewQueue.full()):
+                            self.previewQueue.put_nowait((color_image, hsv8))
+                    except:
+                        pass
                 opencvWindowTimer = timer()
                 print(str(opencvWindowTimer - start) + " opencv window time")
 

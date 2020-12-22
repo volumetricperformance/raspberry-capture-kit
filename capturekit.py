@@ -227,9 +227,9 @@ def main():
     global messageQueue
 
     #queue of images
-    previewQueue = Queue()
+    previewQueue = Queue(maxsize=3)
     #queue of status messages
-    statusQueue = Queue()
+    statusQueue = Queue(maxsize=100)
     #queue of gstreamer messages
     messageQueue = Queue()
 
