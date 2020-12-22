@@ -107,25 +107,25 @@ class RealsenseCapture (mp.Process):
 
         if t == Gst.MessageType.EOS:
             print("Eos")
-            self.statusQueue.put('WARNING: End of Stream')
+            self.statusQueue.put_nowait('WARNING: End of Stream')
 
         elif t == Gst.MessageType.INFO:
-            self.statusQueue.put('INFO: %s, %s' % (msg.src.name, msg.get_structure().to_string()))
+            self.statusQueue.put_nowait('INFO: %s, %s' % (msg.src.name, msg.get_structure().to_string()))
 
         elif t == Gst.MessageType.STATE_CHANGED:
             old_state, new_state, pending_state = message.parse_state_changed()
             #print("Pipeline state changed from %s to %s." %  (old_state.value_nick, new_state.value_nick))
-            self.statusQueue.put("STREAM_STATE_CHANGED: %s, %s, %s" % (message.src.name, old_state.value_nick, new_state.value_nick))
+            self.statusQueue.put_nowait("STREAM_STATE_CHANGED: %s, %s, %s" % (message.src.name, old_state.value_nick, new_state.value_nick))
 
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
             print('Warning: %s: %s\n' % (err, debug))
-            self.statusQueue.put('WARNING: %s, %s' % (err, debug) )
+            self.statusQueue.put_nowait('WARNING: %s, %s' % (err, debug) )
             #sys.stderr.write('Warning: %s: %s\n' % (err, debug))
         elif t == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
             print('Error: %s: %s\n' % (err, debug))
-            self.statusQueue.put('ERROR: %s, %s' % (err, debug) )
+            self.statusQueue.put_nowait('ERROR: %s, %s' % (err, debug) )
             self.shutdown()
             #sys.stderr.write('Error: %s: %s\n' % (err, debug))       
         return True
@@ -169,10 +169,10 @@ class RealsenseCapture (mp.Process):
             # 5. Skip the first 30 frames.
             # This gives the Auto-Exposure time to adjust
             # ===========================================
-            #for x in range(30):
-            #    frames = self.rspipeline.wait_for_frames()
-            #    # Align the depth frame to color frame
-            #    aligned_frames = align.process(frames)
+            for x in range(30):
+                frames = self.rspipeline.wait_for_frames()
+                # Align the depth frame to color frame
+                aligned_frames = align.process(frames)
 
             print("Intel Realsense started successfully.")
             print("")
@@ -340,14 +340,20 @@ class RealsenseCapture (mp.Process):
                 #if we don't check for exit here the shutdown process hangs here
                 #start = timer()
                 if(not self.exit.is_set()):
-                    self.previewQueue.put_nowait(np.hstack((color_image, hsv8)))
+                    try:
+                        if(not self.previewQueue.full()):
+                            self.previewQueue.put_nowait(np.hstack((color_image, hsv8)))
+                    except:
+                        pass
+
                 opencvWindowTimer = timer()
-                print(str(opencvWindowTimer - start) + " opencv window time")
+                
+                #print(str(opencvWindowTimer - start) + " opencv window time")
 
         except:        
             e = sys.exc_info()[0]
             print( "Unexpected Error: %s" % e )
-            self.statusQueue.put("ERROR: Unexpected Error: %s" % e)
+            self.statusQueue.put_nowait("ERROR: Unexpected Error: %s" % e)
 
         finally:
             # Stop streaming
@@ -358,8 +364,8 @@ class RealsenseCapture (mp.Process):
                 if( self.gstpipe.get_state()[1] is not Gst.State.PAUSED ):
                     self.gstpipe.set_state(Gst.State.PAUSED)
             except:
-                self.statusQueue.put("ERROR: Error pausing gstreamer")
+                self.statusQueue.put_nowait("ERROR: Error pausing gstreamer")
                 print ("Error pausing gstreamer")        
         
-        self.statusQueue.put("INFO: Exiting Realsense Capture process")
+        self.statusQueue.put_nowait("INFO: Exiting Realsense Capture process")
         print ("Exiting capture loop")

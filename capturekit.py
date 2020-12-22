@@ -21,7 +21,6 @@ from threading import Thread
 import multiprocessing
 from multiprocessing import Process, Queue
 import multiprocessing.queues as mpq
-from multiprocessing import Process, SimpleQueue
 
 import flask
 from flask import Flask, Response, render_template, send_from_directory
@@ -187,25 +186,15 @@ class WebSocketServer(object):
 
 def Status():
     result = None
+    global statusQueue
+
     try:
         if( not statusQueue.empty() ):
-            result = statusQueue.get()
+            result = statusQueue.get(block=False)
     except queue.Empty:
         pass
 
     return result
-
-def LastPreview():
-    result = None
-
-    try:
-        while( not previewQueue.empty() ):
-            result = previewQueue.get()
-    except queue.Empty:
-        pass
-
-    return result
-
 
 def main():
     
@@ -217,9 +206,9 @@ def main():
     global statusQueue
 
     #queue of images
-    previewQueue = Queue()
+    previewQueue = Queue(maxsize=3)
     #queue of status messages
-    statusQueue = SimpleQueue()
+    statusQueue = Queue(maxsize=100)
 
 
     try:
@@ -285,9 +274,13 @@ def main():
                     if len(streams) > 0:                                            
                         #recording / red
                         uiframe[:] = (50, 50, 175) 
-                        newpreview = LastPreview()
-                        if( newpreview is not None ):
-                            preview = newpreview
+                        preview[:] = (0,0,0)
+                        try:
+                            while( not previewQueue.empty() ):
+                                preview = previewQueue.get(block=False)
+                                #previewQueue.task_done()
+                        except queue.Empty:
+                            pass
                     else:
                         preview[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
