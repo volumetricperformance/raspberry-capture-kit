@@ -27,6 +27,7 @@ import flask
 from flask import Flask, Response, render_template, send_from_directory
 from flask_socketio import SocketIO, emit
 from realsense_rtmp_stream import RealsenseCapture
+from gstreamer_sender import GStreamerSender
 
 from colorama import Fore, Back, Style
 from colorama import init
@@ -46,6 +47,8 @@ hostip = ""
 previewQueue = None
 #queue of status messages
 statusQueue = None
+#queue of messages
+messageQueue = None
 
 
 app = Flask(__name__, 
@@ -92,10 +95,13 @@ def handle_start(url):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         json_file = dir_path + "/" + "MidResHighDensityPreset.json" # MidResHighDensityPreset.json / custom / MidResHighAccuracyPreset
 
-        stream = RealsenseCapture( url, json_file, 640, 480, previewQueue,statusQueue )
+        gstMessager = GStreamerSender( url, 640, 480, statusQueue, messageQueue)
+        stream = RealsenseCapture( url, json_file, 640, 480, previewQueue,statusQueue, messageQueue )
         streaming = True        
         stream.start()
         streams.append(stream)
+        gstMessager.start()
+        streams.append(gstMessager)
 
 
 @socketio.on('stop')
@@ -107,6 +113,8 @@ def handle_stop():
     streaming = False
     if len(streams) > 0:
         streams[0].shutdown()
+        streams[1].shutdown()
+        streams.remove(streams[1])
         streams.remove(streams[0])
 
 @app.route('/')
@@ -200,7 +208,8 @@ def LastPreview():
 
     try:
         while( not previewQueue.empty() ):
-            result = previewQueue.get_nowait()
+            (color,depth) = previewQueue.get_nowait()
+            result = np.hstack((color,depth))
     except queue.Empty:
         pass
 
@@ -215,11 +224,14 @@ def main():
     
     global previewQueue
     global statusQueue
+    global messageQueue
 
     #queue of images
     previewQueue = Queue()
     #queue of status messages
     statusQueue = Queue()
+    #queue of gstreamer messages
+    messageQueue = Queue()
 
 
     try:
@@ -325,6 +337,7 @@ def main():
             streaming = False
             print('shutdown stream')  
             streams[0].shutdown()
+            streams[1].shutdown()
 
         try:
             shutdown_server = requests.get("http://localhost:5000/shutdown", data=None)
