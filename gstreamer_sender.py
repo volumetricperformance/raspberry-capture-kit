@@ -106,7 +106,8 @@ class GStreamerSender(mp.Process):
                     #msgprocesstime = timer()
                     #print(str(msgprocesstime-start) + " gstreamer message queue time")
             except queue.Empty:
-                time.sleep(0.02)
+                pass
+            time.sleep(0.02)
         try:
             if( self.gstpipe.get_state()[1] is not Gst.State.PAUSED ):
                 self.gstpipe.set_state(Gst.State.PAUSED)

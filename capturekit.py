@@ -191,7 +191,7 @@ class WebSocketServer(object):
                 except:
                     pass   
 
-            socketio.sleep(0.1)
+            socketio.sleep(0.01)
 
 def Status():
     result = None
@@ -209,10 +209,10 @@ def LastPreview():
     try:
         while( not previewQueue.empty() ):
             (color,depth) = previewQueue.get_nowait()
-            result = np.hstack((color,depth))
     except queue.Empty:
         pass
 
+    result = np.hstack((color,depth))
     return result
 
 
