@@ -109,6 +109,20 @@ class RealsenseCapture (mp.Process):
         config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 30)
 
+        min_depth = 0.1
+        max_depth = 4.0
+
+        # Create colorizer object
+        colorizer = rs.colorizer()
+        colorizer.set_option(rs.option.color_scheme, 9)
+        colorizer.set_option(rs.option.histogram_equalization_enabled,0)
+        colorizer.set_option(rs.option.min_distance, min_depth)
+        colorizer.set_option(rs.option.max_distance, max_depth)
+        # Filter
+        thr_filter = rs.threshold_filter()
+        thr_filter.set_option(rs.option.min_distance, min_depth)
+        thr_filter.set_option(rs.option.max_distance, max_depth)
+
         # ======================
         # 2. Start the streaming
         # ======================
@@ -201,66 +215,26 @@ class RealsenseCapture (mp.Process):
                 # ======================================================================
                 # 12. Conver depth to hsv
                 # ==================================
-                # We need to encode/pack the 16bit depth value to RGB
-                # we do this by treating it as the Hue in HSV. 
-                # we then encode HSV to RGB and stream that
-                # on the other end we reverse RGB to HSV, H will give us the depth value back.
-                # HSV elements are in the 0-1 range so we need to normalize the depth array to 0-1
-                # First set a far plane and set everything beyond that to 0
+                filtered = thr_filter.process(depth_frame)
+                depth_color_frame = colorizer.colorize(filtered)
 
-                clipped = depth_image > 4000
-                depth_image[clipped] = 0
+                # Convert depth_frame to numpy array to render image in opencv
+                depth_color_image = np.asanyarray(depth_color_frame.get_data())
 
-                # Now normalize using that far plane
-                # cv expects the H in degrees, not 0-1 :(
-                depth_image_norm = (depth_image * (360/4000)).astype( np.float32)
-
-                # Create 3 dimensional HSV array where H=depth, S=1, V=1
-                depth_hsv = np.concatenate([depth_image_norm[..., np.newaxis]]*3, axis=2)
-                #depth_hsv[:,:,0] = 1
-                depth_hsv[:,:,1] = 1
-                depth_hsv[:,:,2] = 1
-
-                discard = depth_image_norm == 0
-                s = depth_hsv[:,:,1]
-                v = depth_hsv[:,:,2] 
-                s[ discard] = 0
-                v[ discard] = 0
-
-                # cv2.cvtColor to convert HSV to RGB
-                # problem is that cv2 expects hsv to 8bit (0-255)
-                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
-                hsv8 = (hsv*255).astype( np.uint8)
-
-                # Stack rgb and depth map images horizontally for visualisation only
-                #images = np.vstack((color_image, hsv8))
-
-                # push to gstreamer
-                #frame = images.tostring()
-                #start = timer()
-                #buf = Gst.Buffer.new_allocate(None, len(frame), None)
-                #buffAllocationTime = timer()
-                #print(str(buffAllocationTime-start) + " buffer allocation time")
-                #buf.fill(0,frame)
-                #start = timer()
-                #appsrc.emit("push-buffer", buf)
-                self.messageQueue.put_nowait((color_image,hsv8))
-                #emitTime = timer()
-                #print(str(emitTime-start) + " push stream")
-
-
-                #preview side by side because of landscape orientation of the pi 
-
-                #if we don't check for exit here the shutdown process hangs here
-                #start = timer()
                 if(not self.exit.is_set()):
                     try:
-                        if(not self.previewQueue.full()):
-                            self.previewQueue.put_nowait((color_image, hsv8))
+                        #if(not self.messageQueue.full()):
+                        self.messageQueue.put_nowait((color_image, depth_color_image))
                     except:
                         pass
-                opencvWindowTimer = timer()
-                print(str(opencvWindowTimer - start) + " opencv window time")
+                    
+                    try:
+                        #if(not self.previewQueue.full()):
+                        self.previewQueue.put_nowait((color_image, depth_color_image))
+                    except:
+                        pass
+                frameTimer = timer()
+                print("realsense frame: %s" % str(1/(frameTimer-start)))
 
         except:        
             e = sys.exc_info()[0]

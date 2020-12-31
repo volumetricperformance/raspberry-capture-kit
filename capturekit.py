@@ -184,7 +184,7 @@ class WebSocketServer(object):
             if( len(streams)>0):
                 try:
                     status = Status()
-                    while( status is not None ):
+                    if( status is not None ):
                         print('status: %s' % (status) )
                         status = Status()
                         socketio.emit("status", status)
@@ -231,8 +231,7 @@ def main():
     #queue of status messages
     statusQueue = Queue(maxsize=100)
     #queue of gstreamer messages
-    messageQueue = Queue()
-
+    messageQueue = Queue(maxsize=3)
 
     try:
         log = ''
@@ -297,9 +296,16 @@ def main():
                     if len(streams) > 0:                                            
                         #recording / red
                         uiframe[:] = (50, 50, 175) 
-                        newpreview = LastPreview()
-                        if( newpreview is not None ):
-                            preview = newpreview
+                        preview[:] = (0,0,0)
+                        try:
+                            while( not previewQueue.empty() ):
+                                (color,depth) = previewQueue.get(block=False)
+                                #previewQueue.task_done()
+                        except queue.Empty:
+                            pass
+
+                        preview = np.hstack((color,depth))
+
                     else:
                         preview[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
@@ -318,7 +324,7 @@ def main():
                 if cv2.waitKey(1) == 27:
                     running = False
 
-                socketio.sleep(0.1)
+                socketio.sleep(0.03)
 
         else:
                 uiframe[:] = (0, 165, 255)  

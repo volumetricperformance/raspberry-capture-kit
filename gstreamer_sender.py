@@ -7,6 +7,7 @@ import time
 import sys
 import platform
 import asyncio
+from timeit import default_timer as timer
 
 import multiprocessing.queues as mpq
 from multiprocessing import Process, Queue
@@ -78,6 +79,8 @@ class GStreamerSender(mp.Process):
             try:
                 while(not self.messageQueue.empty()):
                     (color,depth) = self.messageQueue.get_nowait()
+
+                    start = timer()
                     image = np.vstack((color, depth))
                     frame = image.tostring()
                     if buff is None:
@@ -85,7 +88,6 @@ class GStreamerSender(mp.Process):
                     buff.fill(0,frame)
                     self.appsrc.emit("push-buffer", buff)
                     #process any messages from gstreamer
-                    #start = timer()
                     msg = self.bus.pop_filtered(
                         Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                     )
@@ -99,11 +101,12 @@ class GStreamerSender(mp.Process):
                             Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                         )
 
-                    #msgprocesstime = timer()
+                    msgprocesstime = timer()
                     #print(str(msgprocesstime-start) + " gstreamer message queue time")
+                    time.sleep(0.005) 
+
             except queue.Empty:
                 pass
-            time.sleep(0.02)
         try:
             if( self.gstpipe.get_state()[1] is not Gst.State.PAUSED ):
                 self.gstpipe.set_state(Gst.State.PAUSED)
