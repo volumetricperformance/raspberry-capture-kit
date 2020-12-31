@@ -24,7 +24,8 @@ Gst.init(None)
 #Gst.debug_set_active(True)
 #Gst.debug_set_default_threshold(4)
 
-rtmp_url = "rtmp://global-live.mux.com:5222/app/24b131aa-2712-49cb-9035-78013d501544"
+#rtmp_url = "rtmp://global-live.mux.com:5222/app/24b131aa-2712-49cb-9035-78013d501544"
+rtmp_url = "rtmp://localhost:1935/live/macos"
 width = 640
 height = 480
 
@@ -76,7 +77,7 @@ profile = pipeline.start(config)
 align_to = rs.stream.depth
 align = rs.align(align_to)
 
-min_depth = 0.1
+min_depth = 0.3
 max_depth = 4.0
 
 # Create colorizer object
@@ -115,8 +116,6 @@ try:
         start = timer()
         
         # Align the depth frame to color frame
-        #aligned_frames = align.process(frames)
-
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
         if not depth_frame or not color_frame:
@@ -166,7 +165,7 @@ try:
 
 
         # Colorize depth frame to jet colormap
-        depth_color_frame = colorizer.colorize(filtered)
+        depth_color_frame = colorizer.process(filtered)
 
         # Convert depth_frame to numpy array to render image in opencv
         depth_color_image = np.asanyarray(depth_color_frame.get_data())
