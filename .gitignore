@@ -16,3 +16,5 @@ captured_images
 __pycache__/
 
 .vscode/
+
+*.bag
