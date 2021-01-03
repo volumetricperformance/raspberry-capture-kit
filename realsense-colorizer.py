@@ -43,6 +43,8 @@ if platform.system() == "Linux":
 
 elif platform.system() == "Darwin":
     #macos
+
+    #stream to rtmp
     #CLI='flvmux name=mux streamable=true ! rtmpsink location="'+  rtmp_url +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
     #    appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
     #    videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! \
@@ -50,7 +52,15 @@ elif platform.system() == "Darwin":
     #    osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
     #    queue max-size-buffers=4 ! mux.'
 
-    CLI='appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE caps="video/x-raw,format=BGR,width='+str(width)+',height='+ str(height*2) + ',framerate=(fraction)30/1,pixel-aspect-ratio=(fraction)1/1" ! videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! queue max-size-buffers=4 ! flvmux name=mux ! rtmpsink location="'+ rtmp_url +'" sync=true   osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! queue max-size-buffers=4 ! mux.' 
+    #save to webm
+    CLI='webmmux name=mux ! filesink location=test.webm \
+        appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
+        videoconvert ! vp8enc ! queue ! \
+        mux.video_0 \
+        osxaudiosrc do-timestamp=true ! audioconvert ! vorbisenc ! \
+        queue max-size-buffers=4 ! mux.audio_0'
+
+    #CLI='appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE caps="video/x-raw,format=BGR,width='+str(width)+',height='+ str(height*2) + ',framerate=(fraction)30/1,pixel-aspect-ratio=(fraction)1/1" ! videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! queue max-size-buffers=4 ! flvmux name=mux ! rtmpsink location="'+ rtmp_url +'" sync=true   osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! queue max-size-buffers=4 ! mux.' 
 
 
 #TODO: windows
@@ -67,6 +77,8 @@ gstpipe.set_state(Gst.State.PLAYING)
 # Configure depth and color streams
 pipeline = rs.pipeline()
 config = rs.config()
+#rs.config.enable_device_from_file(config, "20210102_083625.bag")
+
 config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
