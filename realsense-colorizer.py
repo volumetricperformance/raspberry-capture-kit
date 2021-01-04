@@ -18,13 +18,14 @@ from timeit import default_timer as timer
 
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import GObject, Gst
+gi.require_version('GstBase', '1.0')
+from gi.repository import GObject, Gst, GstBase
 
 Gst.init(None)
 #Gst.debug_set_active(True)
 #Gst.debug_set_default_threshold(4)
 
-rtmp_url = "rtmp://global-live.mux.com:5222/app/24b131aa-2712-49cb-9035-78013d501544"
+sink = "test-colorized.mp4"
 width = 640
 height = 480
 
@@ -34,34 +35,50 @@ caps =  'caps="video/x-raw,format=BGR,width='+str(width)+',height='+ str(height*
 if platform.system() == "Linux":
     #assuming Linux means RPI
     
-    CLI='flvmux name=mux streamable=true latency=3000000000 ! rtmpsink location="'+  rtmp_url +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
+    #rtmp
+    #CLI='flvmux name=mux streamable=true latency=3000000000 ! rtmpsink location="'+  sink +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
+    #    appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
+    #    videoconvert !  omxh264enc ! video/x-h264 ! h264parse ! video/x-h264 ! \
+    #    queue max-size-buffers=0 max-size-bytes=0 max-size-time=180000000 min-threshold-buffers=1 leaky=upstream ! mux. \
+    #    alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 !  audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
+    #    queue max-size-buffers=0 max-size-bytes=0 max-size-time=4000000000 min-threshold-buffers=1 ! mux.'
+
+    #mp4
+    CLI='qtmux name=mux streamable=true ! filesink location="'+  sink +'" \
         appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
-        videoconvert !  omxh264enc ! video/x-h264 ! h264parse ! video/x-h264 ! \
-        queue max-size-buffers=0 max-size-bytes=0 max-size-time=180000000 min-threshold-buffers=1 leaky=upstream ! mux. \
+        videoconvert ! omxh264enc ! h264parse ! video/x-h264 ! \
+        queue ! mux.video_0 \
         alsasrc ! audio/x-raw, format=S16LE, rate=44100, channels=1 ! voaacenc bitrate=44100 !  audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
-        queue max-size-buffers=0 max-size-bytes=0 max-size-time=4000000000 min-threshold-buffers=1 ! mux.'
+        queue max-size-buffers=0 max-size-bytes=0 max-size-time=4000000000 min-threshold-buffers=1 ! mux.audio_0'
 
 elif platform.system() == "Darwin":
     #macos
 
     #stream to rtmp
-    #CLI='flvmux name=mux streamable=true ! rtmpsink location="'+  rtmp_url +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
+    #CLI='flvmux name=mux streamable=true ! rtmpsink location="'+  sink +' live=1 flashver=FME/3.0%20(compatible;%20FMSc%201.0)" \
     #    appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
     #    videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! \
     #    queue max-size-buffers=4 ! flvmux name=mux. \
     #    osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! \
     #    queue max-size-buffers=4 ! mux.'
 
-    #save to webm
-    CLI='webmmux name=mux ! filesink location=test.webm \
-        appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
-        videoconvert ! vp8enc ! queue ! \
+    #CLI='appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE caps="video/x-raw,format=BGR,width='+str(width)+',height='+ str(height*2) + ',framerate=(fraction)30/1,pixel-aspect-ratio=(fraction)1/1" ! videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! queue max-size-buffers=4 ! flvmux name=mux ! rtmpsink location="'+ sink +'" sync=true   osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! queue max-size-buffers=4 ! mux.' 
+
+    #save to webm (does not work on rpi)
+    #CLI='webmmux name=mux ! filesink location="'+  sink +'" \
+    #    appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE '+ str(caps) +' ! \
+    #    videoconvert ! vp8enc ! queue ! \
+    #    mux.video_0 \
+    #    osxaudiosrc do-timestamp=true ! audioconvert ! vorbisenc ! \
+    #    queue max-size-buffers=4 ! mux.audio_0'
+
+    #save to mp4
+    CLI='mp4mux name=mux streamable=true ! filesink location="'+  sink +'" \
+        appsrc name=mysource format=TIME do-timestamp=true is-live=true '+ str(caps) +' ! \
+        videoconvert ! vtenc_h264_hw ! h264parse ! video/x-h264 ! queue ! \
         mux.video_0 \
-        osxaudiosrc do-timestamp=true ! audioconvert ! vorbisenc ! \
-        queue max-size-buffers=4 ! mux.audio_0'
-
-    #CLI='appsrc name=mysource format=TIME do-timestamp=TRUE is-live=TRUE caps="video/x-raw,format=BGR,width='+str(width)+',height='+ str(height*2) + ',framerate=(fraction)30/1,pixel-aspect-ratio=(fraction)1/1" ! videoconvert ! vtenc_h264 ! video/x-h264 ! h264parse ! video/x-h264 ! queue max-size-buffers=4 ! flvmux name=mux ! rtmpsink location="'+ rtmp_url +'" sync=true   osxaudiosrc do-timestamp=true ! audioconvert ! audioresample ! audio/x-raw,rate=48000 ! faac bitrate=48000 ! audio/mpeg ! aacparse ! audio/mpeg, mpegversion=4 ! queue max-size-buffers=4 ! mux.' 
-
+        osxaudiosrc do-timestamp=true ! audioconvert ! avenc_aac ! aacparse ! queue ! \
+        mux.audio_0' 
 
 #TODO: windows
 
@@ -71,8 +88,25 @@ gstpipe=Gst.parse_launch(CLI)
 appsrc=gstpipe.get_by_name("mysource")
 appsrc.set_property('emit-signals',True) #tell sink to emit signals
 
-gstpipe.set_state(Gst.State.PLAYING)
+#NOTE: this only applies for mp4, not rtmp!
+if platform.system() == "Linux":
+    #on rpi with older version of gstreamer 1.4 we get "gst_qt_mux_add_buffer: error: Buffer has no PTS."
+    #this is the fix
+    #https://stackoverflow.com/questions/42874691/gstreamer-for-android-buffer-has-no-pts
+    #https://gist.github.com/zougloub/0747f84d45bc35413c0c19584c398b3d#file-dvr-py-L83
+    it0 = gstpipe.iterate_elements()
+    while True:
+        res0, e = it0.next()
+        
+        if e is None:
+            break
 
+        if e.name == "h264parse0":
+            #Workaround  PTS issue            
+            GstBase.BaseParse.set_infer_ts(e, True)
+            GstBase.BaseParse.set_pts_interpolation(e, True)
+
+gstpipe.set_state(Gst.State.PLAYING)
 
 # Configure depth and color streams
 pipeline = rs.pipeline()
@@ -115,8 +149,9 @@ cv2.moveWindow("RealSense", 0,0)
 depth_sensor = profile.get_device().first_depth_sensor()
 
 intrinsics = True
+running = True
 try:
-    while True:
+    while running:
 
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
@@ -220,9 +255,22 @@ try:
         total = rl_frame+rl_dpfilter+rl_colorize+cv_stack+gst+cvwait
 
         #print('wait:{0:.4f},frame:{1:.4f},filter:{2:.4f},color:{3:.4f},stack:{4:.4f},send:{5:.4f},show:{6:.4f},total{7:.4f}'.format( rl_wait*1000, rl_frame*1000, rl_dpfilter*1000, rl_colorize*1000, cv_stack*1000,gst*1000,cvwait*1000, total*1000) )
-        cv2.waitKey(1)
+        if cv2.waitKey(1) == 27:
+            running = False
 
 finally:
+    appsrc.emit("end-of-stream")
 
+    print("Sending an EOS event to the pipeline")
+    gstpipe.send_event(Gst.Event.new_eos())
+    print("Waiting for the EOS message on the bus")
+    bus = gstpipe.get_bus()
+    bus.timed_pop_filtered(Gst.CLOCK_TIME_NONE, Gst.MessageType.EOS)
+    print("Stopping pipeline")
+    gstpipe.set_state(Gst.State.NULL) 
+
+    print("Stopping realsense")
     # Stop streaming
     pipeline.stop()
+
+    
