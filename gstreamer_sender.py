@@ -30,6 +30,17 @@ class GStreamerSender(mp.Process):
         self.exit = mp.Event()
         print("Initialized GStreamerSender")
 
+    def LastMessage(self, messageQueue):
+        result = None
+
+        try:
+            while( not messageQueue.empty() ):
+                result = messageQueue.get_nowait()
+        except queue.Empty:
+            pass
+
+        return result
+
     def run(self):
         # ===========================================
         # 6. Setup gstreamer
@@ -76,77 +87,52 @@ class GStreamerSender(mp.Process):
 
         print("Starting message loop")
         buff = None
-        depth_hsv = np.zeros((480, 640, 3), dtype=np.float32)
 
+        start = timer()
         while not self.exit.is_set():
-            try:
-                while(not self.messageQueue.empty()):
-                    start = timer()
-                    (color_image,depth_image) = self.messageQueue.get_nowait()
-                    #color is nparray of rl color, depth is nparray of rl depth
+            process = False
+            result = self.LastMessage(self.messageQueue)
+            if result is None:
+                time.sleep(0.005)
+                continue
+                
+            depth_image = result[1]
+            color_image = result[0]   
+            
+            
+            # Stack both images horizontally
+            image = np.vstack((color_image, depth_image))       
+            frame = image.tostring()
+            if buff is None:
+                buff = Gst.Buffer.new_allocate(None, len(frame), None)
+            buff.fill(0,frame)
+            self.appsrc.emit("push-buffer", buff)
+            #process any messages from gstreamer
+            msg = self.bus.pop_filtered(
+                Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
+            )
+            #msgprocesstime = timer()
+            #print(str(msgprocesstime-start) + " gstreamer process time")
+            #empty the message queue if there is one
+            #start = timer()
+            while( msg ): 
+                self.on_bus_message(msg)
+                msg = self.bus.pop_filtered(
+                    Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
+                )
 
-                    # We need to encode/pack the 16bit depth value to RGB
-                    # we do this by treating it as the Hue in HSV. 
-                    # we then encode HSV to RGB and stream that
-                    # on the other end we reverse RGB to HSV, H will give us the depth value back.
-                    # HSV elements are in the 0-1 range so we need to normalize the depth array to 0-1
-                    # First set a far plane and set everything beyond that to 0
-                    
-                    clipped = depth_image > 4000
-                    depth_image[clipped] = 0
+            if(not self.exit.is_set()):
+                try:
+                    if(not self.previewQueue.full()):
+                        self.previewQueue.put_nowait((color_image, depth_image))
+                except:
+                    pass
 
-                    # Now normalize using that far plane
-                    # cv expects the H in degrees, not 0-1 :(
-                    depth_image *= (360/4000)
-                    depth_hsv[:,:,0] = depth_image
-                    depth_hsv[:,:,1] = 1
-                    depth_hsv[:,:,2] = 1
-                    discard = depth_image == 0
-                    s = depth_hsv[:,:,1]
-                    v = depth_hsv[:,:,2] 
-                    s[ discard] = 0
-                    v[ discard] = 0
-                    
-                    # cv2.cvtColor to convert HSV to RGB
-                    hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR_FULL)
+            msgprocesstime = timer()
+            print("gstreamer frame: %s" % str(1/(msgprocesstime-start)))
+            start = timer()
 
-                    # cv2 needs hsv to 8bit (0-255) to stack with the color image
-                    hsv8 = (hsv*255).astype( np.uint8)
-                    
-                    # Stack both images horizontally
-                    image = np.vstack((color_image, hsv8))       
-                    frame = image.tostring()
-                    if buff is None:
-                        buff = Gst.Buffer.new_allocate(None, len(frame), None)
-                    buff.fill(0,frame)
-                    self.appsrc.emit("push-buffer", buff)
-                    #process any messages from gstreamer
-                    msg = self.bus.pop_filtered(
-                        Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
-                    )
-                    #msgprocesstime = timer()
-                    #print(str(msgprocesstime-start) + " gstreamer process time")
-                    #empty the message queue if there is one
-                    #start = timer()
-                    while( msg ): 
-                        self.on_bus_message(msg)
-                        msg = self.bus.pop_filtered(
-                            Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
-                        )
-
-                    if(not self.exit.is_set()):
-                        try:
-                            if(not self.previewQueue.full()):
-                                self.previewQueue.put_nowait((color_image, hsv8))
-                        except:
-                            pass
-
-                    msgprocesstime = timer()
-                    print("gstreamer frame: %s" % str(1/(msgprocesstime-start)))
-                    time.sleep(0.005) 
-
-            except queue.Empty:
-                pass
+            
         try:
             if( self.gstpipe.get_state()[1] is not Gst.State.PAUSED ):
                 self.gstpipe.set_state(Gst.State.PAUSED)
@@ -161,11 +147,11 @@ class GStreamerSender(mp.Process):
 
     def on_bus_message(self, message):
         t = message.type
-        
+        """
         print('{} {}: {}'.format(
                 Gst.MessageType.get_name(message.type), message.src.name,
                 message.get_structure().to_string()))
-
+        """
         if t == Gst.MessageType.EOS:
             print("Eos")
             self.statusQueue.put_nowait('WARNING: End of Stream')
@@ -180,7 +166,7 @@ class GStreamerSender(mp.Process):
 
         elif t == Gst.MessageType.WARNING:
             err, debug = message.parse_warning()
-            print('Warning: %s: %s\n' % (err, debug))
+            #print('Warning: %s: %s\n' % (err, debug))
             self.statusQueue.put_nowait('WARNING: %s, %s' % (err, debug) )
             #sys.stderr.write('Warning: %s: %s\n' % (err, debug))
         elif t == Gst.MessageType.ERROR:

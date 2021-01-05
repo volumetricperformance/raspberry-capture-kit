@@ -105,8 +105,8 @@ class RealsenseCapture (mp.Process):
         # ========================
         self.rspipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 30)
-        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 30)
+        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 15)
+        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 15)
 
         # ======================
         # 2. Start the streaming
@@ -138,10 +138,10 @@ class RealsenseCapture (mp.Process):
             # 5. Skip the first 30 frames.
             # This gives the Auto-Exposure time to adjust
             # ===========================================
-            #for x in range(30):
-            #    frames = self.rspipeline.wait_for_frames()
-            #    # Align the depth frame to color frame
-            #    aligned_frames = align.process(frames)
+            for x in range(30):
+                frames = self.rspipeline.wait_for_frames()
+                # Align the depth frame to color frame
+                aligned_frames = align.process(frames)
 
             print("Intel Realsense started successfully.")
             print("")
@@ -151,13 +151,15 @@ class RealsenseCapture (mp.Process):
             #self.gstreamer.start()
 
             intrinsics = True
+            depth_hsv = np.zeros((480, 640, 3), dtype=np.float32)
+
+            start = timer()
             
             while not self.exit.is_set():
                 # ======================================
                 # 7. Wait for a coherent pair of frames:
                 # ======================================
-                start = timer()
-                frames = self.rspipeline.wait_for_frames(1000)
+                frames = self.rspipeline.wait_for_frames()
                 #waitFrameTime = timer()
                 #print(str(waitFrameTime-start) + " Wait frame time")
 
@@ -196,16 +198,47 @@ class RealsenseCapture (mp.Process):
                 # ==================================
                 depth_image = np.asanyarray(depth_frame.get_data()).astype( np.float32)
                 color_image = np.asanyarray(color_frame.get_data())
+                
+                #color is nparray of rl color, depth is nparray of rl depth
+
+                # We need to encode/pack the 16bit depth value to RGB
+                # we do this by treating it as the Hue in HSV. 
+                # we then encode HSV to RGB and stream that
+                # on the other end we reverse RGB to HSV, H will give us the depth value back.
+                # HSV elements are in the 0-1 range so we need to normalize the depth array to 0-1
+                # First set a far plane and set everything beyond that to 0
+
+                clipped = depth_image > 4000
+                depth_image[clipped] = 0
+
+                # Now normalize using that far plane
+                # cv expects the H in degrees, not 0-1 :(
+                depth_image *= (360/4000)
+                depth_hsv[:,:,0] = depth_image
+                depth_hsv[:,:,1] = 1
+                depth_hsv[:,:,2] = 1
+                discard = depth_image == 0
+                s = depth_hsv[:,:,1]
+                v = depth_hsv[:,:,2] 
+                s[ discard] = 0
+                v[ discard] = 0
+
+                # cv2.cvtColor to convert HSV to RGB
+                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR_FULL)
+
+                # cv2 needs hsv to 8bit (0-255) to stack with the color image
+                hsv8 = (hsv*255).astype( np.uint8)
 
                 if(not self.exit.is_set()):
                     try:
                         if(not self.messageQueue.full()):
-                            self.messageQueue.put_nowait((color_image, depth_image))
+                            self.messageQueue.put_nowait((color_image, hsv8))
                     except:
                         pass
                     
                 frameTimer = timer()
-                #print("realsense frame: %s" % str(1/(frameTimer-start)))
+                print("realsense frame: %s" % str(1/(frameTimer-start)))
+                start = timer()
 
         except:        
             e = sys.exc_info()[0]
