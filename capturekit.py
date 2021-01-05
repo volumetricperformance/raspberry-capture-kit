@@ -95,8 +95,8 @@ def handle_start(url):
         dir_path = os.path.dirname(os.path.realpath(__file__))
         json_file = dir_path + "/" + "MidResHighDensityPreset.json" # MidResHighDensityPreset.json / custom / MidResHighAccuracyPreset
 
-        gstMessager = GStreamerSender( url, 640, 480, statusQueue, messageQueue)
-        stream = RealsenseCapture( url, json_file, 640, 480, previewQueue,statusQueue, messageQueue )
+        gstMessager = GStreamerSender( url, 640, 480, statusQueue, messageQueue, previewQueue)
+        stream = RealsenseCapture( url, json_file, 640, 480, statusQueue, messageQueue )
         streaming = True        
         stream.start()
         streams.append(stream)
@@ -229,7 +229,7 @@ def main():
     #queue of images
     previewQueue = Queue(maxsize=3)
     #queue of status messages
-    statusQueue = Queue(maxsize=100)
+    statusQueue = Queue(maxsize=1000)
     #queue of gstreamer messages
     messageQueue = Queue(maxsize=3)
 
@@ -324,7 +324,7 @@ def main():
                 if cv2.waitKey(1) == 27:
                     running = False
 
-                socketio.sleep(0.03)
+                socketio.sleep(0.1)
 
         else:
                 uiframe[:] = (0, 165, 255)  

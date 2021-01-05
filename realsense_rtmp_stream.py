@@ -44,7 +44,7 @@ class XQueue(mpq.Queue):
 
 class RealsenseCapture (mp.Process):
 
-    def __init__(self, rtmp_uri, config_json, w, h, previewQueue, statusQueue, messageQueue):
+    def __init__(self, rtmp_uri, config_json, w, h, statusQueue, messageQueue):
         mp.Process.__init__(self)
 
         self.exit = mp.Event()
@@ -52,7 +52,6 @@ class RealsenseCapture (mp.Process):
         self.json_file = config_json
         self.width = w
         self.height = h
-        self.previewQueue = previewQueue
         self.statusQueue = statusQueue
         self.messageQueue = messageQueue
         self.rspipeline = None
@@ -108,20 +107,6 @@ class RealsenseCapture (mp.Process):
         config = rs.config()
         config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 30)
         config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 30)
-
-        min_depth = 0.1
-        max_depth = 4.0
-
-        # Create colorizer object
-        colorizer = rs.colorizer()
-        colorizer.set_option(rs.option.color_scheme, 9)
-        colorizer.set_option(rs.option.histogram_equalization_enabled,0)
-        colorizer.set_option(rs.option.min_distance, min_depth)
-        colorizer.set_option(rs.option.max_distance, max_depth)
-        # Filter
-        thr_filter = rs.threshold_filter()
-        thr_filter.set_option(rs.option.min_distance, min_depth)
-        thr_filter.set_option(rs.option.max_distance, max_depth)
 
         # ======================
         # 2. Start the streaming
@@ -209,32 +194,18 @@ class RealsenseCapture (mp.Process):
                 # ==================================
                 # 11. Convert images to numpy arrays
                 # ==================================
-                depth_image = np.asanyarray(depth_frame.get_data())
+                depth_image = np.asanyarray(depth_frame.get_data()).astype( np.float32)
                 color_image = np.asanyarray(color_frame.get_data())
-
-                # ======================================================================
-                # 12. Conver depth to hsv
-                # ==================================
-                filtered = thr_filter.process(depth_frame)
-                depth_color_frame = colorizer.colorize(filtered)
-
-                # Convert depth_frame to numpy array to render image in opencv
-                depth_color_image = np.asanyarray(depth_color_frame.get_data())
 
                 if(not self.exit.is_set()):
                     try:
-                        #if(not self.messageQueue.full()):
-                        self.messageQueue.put_nowait((color_image, depth_color_image))
+                        if(not self.messageQueue.full()):
+                            self.messageQueue.put_nowait((color_image, depth_image))
                     except:
                         pass
                     
-                    try:
-                        #if(not self.previewQueue.full()):
-                        self.previewQueue.put_nowait((color_image, depth_color_image))
-                    except:
-                        pass
                 frameTimer = timer()
-                print("realsense frame: %s" % str(1/(frameTimer-start)))
+                #print("realsense frame: %s" % str(1/(frameTimer-start)))
 
         except:        
             e = sys.exc_info()[0]
