@@ -11,6 +11,7 @@ import os
 import json
 import time
 import platform
+import atexit
 import asyncio
 import netifaces
 import requests
@@ -96,7 +97,7 @@ def handle_start(url):
         json_file = dir_path + "/" + "MidResHighDensityPreset.json" # MidResHighDensityPreset.json / custom / MidResHighAccuracyPreset
 
         gstMessager = GStreamerSender( url, 640, 480, statusQueue, messageQueue, previewQueue)
-        stream = RealsenseCapture( url, json_file, 640, 480, statusQueue, messageQueue )
+        stream = RealsenseCapture( url, json_file, 640, 480, statusQueue, messageQueue, gstMessager )
         streaming = True        
         stream.start()
         streams.append(stream)
@@ -114,8 +115,6 @@ def handle_stop():
     if len(streams) > 0:
         streams[0].shutdown()
         streams[1].shutdown()
-        streams.remove(streams[1])
-        streams.remove(streams[0])
 
 @app.route('/')
 def root():
@@ -123,11 +122,26 @@ def root():
     return app.send_static_file('index.html')
 
 #TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
+@app.route('/shutdown')
+def quit():
+    global running
+    print('/shutdown %s' % (running))
+
+    running = False
+
+    try:
+        socketio.stop()
+    except:
+        pass
+
+    return (' ', 200) 
+
+#TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
 @socketio.on('reboot')
 def handle_reboot():
     global running
     
-    print('Reboot')  
+    print('Reboot %s' % (running))
     running = False
     try:
         socketio.stop()
@@ -142,7 +156,7 @@ def handle_reboot():
 def handle_shutdown():
     global running
     
-    print('Shutdown')  
+    print('Shutdown %s' % (running))
     running = False
     try:
         socketio.stop()
@@ -151,18 +165,6 @@ def handle_shutdown():
 
     if platform.system() == "Linux":
         os.system('systemctl poweroff -i')        
-
-#TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
-@app.route('/shutdown')
-def quit():
-    global running
-    running = False
-
-    print('Shutdown')
-    try:
-        socketio.stop()
-    except:
-        pass
   
 class WebSocketServer(object):
     def __init__(self):
@@ -174,24 +176,30 @@ class WebSocketServer(object):
     def start(self):
         self.thread = socketio.start_background_task(self.start_server)
        	socketio.start_background_task(self.send_status)
-    
+
     def send_status(self):
         
         global streams
         global running        
         
-        while (running==True):        
+        while (running==True):
             if( len(streams)>0):
                 try:
                     status = Status()
                     if( status is not None ):
-                        print('status: %s' % (status) )
+                        #print('status: %s' % (status) )
                         status = Status()
                         socketio.emit("status", status)
                 except:
+                    print('WebSocketServer send_status status exception')
                     pass   
+            try:
+                socketio.sleep(0.01)
+            except:
+                print('WebSocketServer send_status sleep exception')
+                pass    
 
-            socketio.sleep(0.01)
+        print('Exit WebSocketServer')
 
 def Status():
     result = None
@@ -217,7 +225,8 @@ def LastPreview():
 
 
 def main():
-    
+    GObject.threads_init()
+
     global streams
     global streaming
     global running
@@ -226,12 +235,14 @@ def main():
     global statusQueue
     global messageQueue
 
+    atexit.register(term_stream, streams)
+
     #queue of images
     previewQueue = Queue(maxsize=3)
     #queue of status messages
     statusQueue = Queue(maxsize=1000)
     #queue of gstreamer messages
-    messageQueue = Queue(maxsize=3)
+    messageQueue = Queue(maxsize=10)
 
     try:
         log = ''
@@ -277,10 +288,11 @@ def main():
         uiframe[:] = (50, 50, 50)  
 
         preview = np.zeros((480, 1280, 3), np.uint8)
-
+        server = WebSocketServer()
+        server.start()
+        
         if( running ):
-            server = WebSocketServer()
-            server.start()
+
             while(running == True):
             
                 try:
@@ -289,6 +301,8 @@ def main():
 
                     for stream in streams:
                         if( not stream.is_alive()):
+                            print('clean up stream')
+                            stream.terminate()
                             streams.remove(stream)
                             preview[:] = (0,0,0)
                             uiframe[:] = (50, 50, 50)  
@@ -300,7 +314,6 @@ def main():
                         try:
                             while( not previewQueue.empty() ):
                                 (color,depth) = previewQueue.get(block=False)
-                                #previewQueue.task_done()
                         except queue.Empty:
                             pass
 
@@ -323,19 +336,20 @@ def main():
                 # Check if ESC key was pressed
                 if cv2.waitKey(1) == 27:
                     running = False
+                    break
 
                 socketio.sleep(0.1)
 
         else:
                 uiframe[:] = (0, 165, 255)  
                 uiframe = cv2.putText(uiframe, log, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0) , 4, cv2.LINE_AA)
-
                 running = True
                 while(running == True):
                     cv2.imshow(WINDOW_NAME, uiframe) 
                     # Check if ESC key was pressed
                     if cv2.waitKey(1) == 27:
                         running = False
+
     finally:
         print('shutting down')  
 
@@ -344,13 +358,21 @@ def main():
             print('shutdown stream')  
             streams[0].shutdown()
             streams[1].shutdown()
-
+            
         try:
             shutdown_server = requests.get("http://localhost:5000/shutdown", data=None)
         except:
+            print('exception shutting down')  
             pass
+    
+    print('Done?')
 
+def term_stream(streams):
+    if len(streams) > 0:
+        streams[0].terminate()
+        streams[1].terminate()
 
 if __name__ == '__main__':
-    multiprocessing.set_start_method('spawn')
+    multiprocessing.set_start_method('spawn')    
     main()
+    print('Done!')

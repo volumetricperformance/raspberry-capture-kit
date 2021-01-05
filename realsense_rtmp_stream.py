@@ -17,6 +17,7 @@ from timeit import default_timer as timer
 import multiprocessing.queues as mpq
 from multiprocessing import Process, Queue
 import multiprocessing as mp
+from gstreamer_sender import GStreamerSender
 
 from flask import Flask, Response, render_template, send_from_directory
 from flask_socketio import SocketIO, emit
@@ -44,7 +45,7 @@ class XQueue(mpq.Queue):
 
 class RealsenseCapture (mp.Process):
 
-    def __init__(self, rtmp_uri, config_json, w, h, statusQueue, messageQueue):
+    def __init__(self, rtmp_uri, config_json, w, h, statusQueue, messageQueue, gststream):
         mp.Process.__init__(self)
 
         self.exit = mp.Event()
@@ -54,6 +55,7 @@ class RealsenseCapture (mp.Process):
         self.height = h
         self.statusQueue = statusQueue
         self.messageQueue = messageQueue
+        self.gststream = gststream
         self.rspipeline = None
         self.framecount = 0
 
@@ -105,8 +107,8 @@ class RealsenseCapture (mp.Process):
         # ========================
         self.rspipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 15)
-        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 15)
+        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 30)
+        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 30)
 
         # ======================
         # 2. Start the streaming
@@ -233,6 +235,8 @@ class RealsenseCapture (mp.Process):
                     try:
                         if(not self.messageQueue.full()):
                             self.messageQueue.put_nowait((color_image, hsv8))
+                            #notify gstreamer
+                            self.gststream.new_frame()
                     except:
                         pass
                     
@@ -243,15 +247,13 @@ class RealsenseCapture (mp.Process):
         except:        
             e = sys.exc_info()[0]
             print( "Unexpected Error: %s" % e )
-            self.statusQueue.put_nowait("ERROR: Unexpected Error: %s" % e)
+            self.statusQueue.put_nowait("ERROR: Realsense Unexpected Error: %s" % e)
+            self.exit.set()
 
         finally:
             # Stop streaming
             print( "Stop realsense pipeline" )
             self.rspipeline.stop()
-            print( "Pause gstreamer pipe" )
-    
         
-        self.statusQueue.put_nowait("INFO: Exiting Realsense Capture process")
-        print ("Exiting capture loop")
-
+        self.statusQueue.put_nowait("INFO: Exiting Realsense process")
+        print ("Exiting realsense process")

@@ -28,18 +28,8 @@ class GStreamerSender(mp.Process):
         self.statusQueue = statusQueue
         self.previewQueue = previewQueue
         self.exit = mp.Event()
+        self.frameEvent = mp.Event()
         print("Initialized GStreamerSender")
-
-    def LastMessage(self, messageQueue):
-        result = None
-
-        try:
-            while( not messageQueue.empty() ):
-                result = messageQueue.get_nowait()
-        except queue.Empty:
-            pass
-
-        return result
 
     def run(self):
         # ===========================================
@@ -89,57 +79,90 @@ class GStreamerSender(mp.Process):
         buff = None
 
         start = timer()
-        while not self.exit.is_set():
-            process = False
-            result = self.LastMessage(self.messageQueue)
-            if result is None:
-                time.sleep(0.005)
-                continue
+        try:
+            while not self.exit.is_set():
+
+    
+                while not self.frameEvent.is_set() and not self.exit.is_set():
+                    #wait 10ms
+                    self.frameEvent.wait(0.01)        
+                    
+                if self.exit.is_set():
+                    continue
+
+                self.frameEvent.clear()
+
+                process = False
+                result = self.last_message(self.messageQueue)
+                if result is None:
+                    continue
+                    
+                depth_image = result[1]
+                color_image = result[0]   
                 
-            depth_image = result[1]
-            color_image = result[0]   
-            
-            
-            # Stack both images horizontally
-            image = np.vstack((color_image, depth_image))       
-            frame = image.tostring()
-            if buff is None:
-                buff = Gst.Buffer.new_allocate(None, len(frame), None)
-            buff.fill(0,frame)
-            self.appsrc.emit("push-buffer", buff)
-            #process any messages from gstreamer
-            msg = self.bus.pop_filtered(
-                Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
-            )
-            #msgprocesstime = timer()
-            #print(str(msgprocesstime-start) + " gstreamer process time")
-            #empty the message queue if there is one
-            #start = timer()
-            while( msg ): 
-                self.on_bus_message(msg)
+                
+                # Stack both images horizontally
+                image = np.vstack((color_image, depth_image))       
+                frame = image.tostring()
+                if buff is None:
+                    buff = Gst.Buffer.new_allocate(None, len(frame), None)
+                buff.fill(0,frame)
+                self.appsrc.emit("push-buffer", buff)
+                #process any messages from gstreamer
                 msg = self.bus.pop_filtered(
                     Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                 )
+                #msgprocesstime = timer()
+                #print(str(msgprocesstime-start) + " gstreamer process time")
+                #empty the message queue if there is one
+                #start = timer()
+                while( msg ): 
+                    self.on_bus_message(msg)
+                    msg = self.bus.pop_filtered(
+                        Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
+                    )
 
-            if(not self.exit.is_set()):
-                try:
-                    if(not self.previewQueue.full()):
-                        self.previewQueue.put_nowait((color_image, depth_image))
-                except:
-                    pass
+                if(not self.exit.is_set()):
+                    try:
+                        if(not self.previewQueue.full()):
+                            self.previewQueue.put_nowait((color_image, depth_image))
+                    except:
+                        pass
 
-            msgprocesstime = timer()
-            print("gstreamer frame: %s" % str(1/(msgprocesstime-start)))
-            start = timer()
-
-            
-        try:
-            if( self.gstpipe.get_state()[1] is not Gst.State.PAUSED ):
-                self.gstpipe.set_state(Gst.State.PAUSED)
+                msgprocesstime = timer()
+                print("gstreamer frame: %s" % str(1/(msgprocesstime-start)))
+                start = timer()
         except:
-            self.statusQueue.put_nowait("ERROR: Error pausing gstreamer")
-            print ("Error pausing gstreamer")    
+            self.statusQueue.put_nowait("ERROR: gstreamer process frame")
+            print ("Error sending frame to gstreamer")
+            self.exit.set()
+        finally:
+            self.appsrc.emit("end-of-stream")
 
+            print("Sending an EOS event to the pipeline")
+            self.gstpipe.send_event(Gst.Event.new_eos())
+            print("Waiting for the EOS message on the bus")
+            self.bus.timed_pop_filtered(Gst.CLOCK_TIME_NONE, Gst.MessageType.EOS)
+            print("Stopping pipeline")
+            self.gstpipe.set_state(Gst.State.NULL) 
+    
+        #self.statusQueue.put_nowait("INFO: Exiting gstreamer process")
+        print ("Exiting gstreamer process")      
+
+    def last_message(self, messageQueue):
+        result = None
+
+        try:
+            while( not messageQueue.empty() ):
+                result = messageQueue.get_nowait()
+        except queue.Empty:
+            pass
+
+        return result
+
+    def new_frame(self):
+        print("new_frame GStreamerSender")
+        self.frameEvent.set()
 
     def shutdown(self):
         print("Shutdown GStreamerSender")
