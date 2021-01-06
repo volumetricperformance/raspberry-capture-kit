@@ -15,7 +15,7 @@ Opencv window showing the local ip
 In this case the vnc server address would be 192.168.50.198, but this may not be the same for everyone
 
 # Terminal
-Now that VNC Viewer has connected to the Raspbeery Pi it is time to update. In order to update, follow the commands for the terminal, has the >_ icon.
+Now that VNC Viewer has connected to the Raspbeery Pi it is time to update. In order to update, open the terminal by clicking the `>_` icon near the top left of the screen. Then enter the following commands  in the terminal window.
 
 ```
 $ cd Documents/
