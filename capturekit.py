@@ -220,7 +220,8 @@ def LastPreview():
     except queue.Empty:
         pass
 
-    result = np.hstack((color,depth))
+    #result = np.hstack((color,depth))
+    result = depth
     return result
 
 
@@ -287,7 +288,9 @@ def main():
         uiframe = np.zeros((720, 1280, 3), np.uint8)      
         uiframe[:] = (50, 50, 50)  
 
-        preview = np.zeros((480, 1280, 3), np.uint8)
+        preview = np.zeros((480, 640, 3), np.uint8)
+        color = np.zeros((480, 640, 3), np.uint8)
+        depth = np.zeros((480, 640, 3), np.uint8)
         server = WebSocketServer()
         server.start()
         
@@ -317,8 +320,7 @@ def main():
                         except queue.Empty:
                             pass
 
-                        preview = np.hstack((color,depth))
-
+                        preview = color
                     else:
                         preview[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
@@ -326,7 +328,8 @@ def main():
                     pass
     
                 y = 120
-                uiframe[y:y+480, 0:1280] = preview
+                uiframe[y:y+480, 0:640] = color
+                uiframe[y:y+480, 640:1280] = depth
 
                 # Using cv2.putText() method 
                 uiframe = cv2.putText(uiframe, 'http://{0}:5000/'.format( hostip), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 255, 255) , 4, cv2.LINE_AA)
@@ -338,7 +341,7 @@ def main():
                     running = False
                     break
 
-                socketio.sleep(0.1)
+                socketio.sleep(0.2)
 
         else:
                 uiframe[:] = (0, 165, 255)  

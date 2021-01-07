@@ -28,7 +28,6 @@ class GStreamerSender(mp.Process):
         self.statusQueue = statusQueue
         self.previewQueue = previewQueue
         self.exit = mp.Event()
-        self.frameEvent = mp.Event()
         print("Initialized GStreamerSender")
 
     def run(self):
@@ -82,17 +81,6 @@ class GStreamerSender(mp.Process):
         try:
             while not self.exit.is_set():
 
-    
-                while not self.frameEvent.is_set() and not self.exit.is_set():
-                    #wait 10ms
-                    self.frameEvent.wait(0.01)        
-                    
-                if self.exit.is_set():
-                    continue
-
-                self.frameEvent.clear()
-
-                process = False
                 result = self.last_message(self.messageQueue)
                 if result is None:
                     continue
@@ -159,10 +147,6 @@ class GStreamerSender(mp.Process):
             pass
 
         return result
-
-    def new_frame(self):
-        print("new_frame GStreamerSender")
-        self.frameEvent.set()
 
     def shutdown(self):
         print("Shutdown GStreamerSender")

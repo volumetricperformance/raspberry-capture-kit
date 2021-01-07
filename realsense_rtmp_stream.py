@@ -162,13 +162,15 @@ class RealsenseCapture (mp.Process):
                 # 7. Wait for a coherent pair of frames:
                 # ======================================
                 frames = self.rspipeline.wait_for_frames()
-                #waitFrameTime = timer()
-                #print(str(waitFrameTime-start) + " Wait frame time")
 
                 # =======================================
                 # 8. Align the depth frame to color frame
                 # =======================================
                 aligned_frames = align.process(frames)
+                
+                waitFrameTime = timer()
+                #print(str(waitFrameTime-start) + " rl align time")
+                
 
                 # ================================================
                 # 9. Fetch the depth and colour frames from stream
@@ -177,7 +179,7 @@ class RealsenseCapture (mp.Process):
                 color_frame = aligned_frames.get_color_frame()
                 if not depth_frame or not color_frame:
                     pass
-
+                
                 # print the camera intrinsics just once. it is always the same
                 if intrinsics:
                     print("Intel Realsense Camera Intrinsics: ")
@@ -200,6 +202,9 @@ class RealsenseCapture (mp.Process):
                 # ==================================
                 depth_image = np.asanyarray(depth_frame.get_data()).astype( np.float32)
                 color_image = np.asanyarray(color_frame.get_data())
+                
+                #print(str(timer() - waitFrameTime) + " rl frame time")
+                
                 
                 #color is nparray of rl color, depth is nparray of rl depth
 
@@ -230,13 +235,12 @@ class RealsenseCapture (mp.Process):
 
                 # cv2 needs hsv to 8bit (0-255) to stack with the color image
                 hsv8 = (hsv*255).astype( np.uint8)
+                
 
                 if(not self.exit.is_set()):
                     try:
                         if(not self.messageQueue.full()):
                             self.messageQueue.put_nowait((color_image, hsv8))
-                            #notify gstreamer
-                            self.gststream.new_frame()
                     except:
                         pass
                     
