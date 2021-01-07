@@ -313,23 +313,21 @@ def main():
                     if len(streams) > 0:                                            
                         #recording / red
                         uiframe[:] = (50, 50, 175) 
-                        preview[:] = (0,0,0)
+                        depth[:] = (0,0,0)
                         try:
-                            while( not previewQueue.empty() ):
+                            if not previewQueue.empty():
                                 (color,depth) = previewQueue.get(block=False)
                         except queue.Empty:
                             pass
-
-                        preview = color
                     else:
-                        preview[:] = (0,0,0)
+                        depth[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
                 except:
                     pass
     
                 y = 120
-                uiframe[y:y+480, 0:640] = color
-                uiframe[y:y+480, 640:1280] = depth
+                uiframe[y:y+480, 320:640+320] = depth
+                #uiframe[y:y+480, 640:1280] = color
 
                 # Using cv2.putText() method 
                 uiframe = cv2.putText(uiframe, 'http://{0}:5000/'.format( hostip), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 255, 255) , 4, cv2.LINE_AA)

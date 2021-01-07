@@ -205,42 +205,10 @@ class RealsenseCapture (mp.Process):
                 
                 #print(str(timer() - waitFrameTime) + " rl frame time")
                 
-                
-                #color is nparray of rl color, depth is nparray of rl depth
-
-                # We need to encode/pack the 16bit depth value to RGB
-                # we do this by treating it as the Hue in HSV. 
-                # we then encode HSV to RGB and stream that
-                # on the other end we reverse RGB to HSV, H will give us the depth value back.
-                # HSV elements are in the 0-1 range so we need to normalize the depth array to 0-1
-                # First set a far plane and set everything beyond that to 0
-
-                clipped = depth_image > 4000
-                depth_image[clipped] = 0
-
-                # Now normalize using that far plane
-                # cv expects the H in degrees, not 0-1 :(
-                depth_image *= (360/4000)
-                depth_hsv[:,:,0] = depth_image
-                depth_hsv[:,:,1] = 1
-                depth_hsv[:,:,2] = 1
-                discard = depth_image == 0
-                s = depth_hsv[:,:,1]
-                v = depth_hsv[:,:,2] 
-                s[ discard] = 0
-                v[ discard] = 0
-
-                # cv2.cvtColor to convert HSV to RGB
-                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR_FULL)
-
-                # cv2 needs hsv to 8bit (0-255) to stack with the color image
-                hsv8 = (hsv*255).astype( np.uint8)
-                
-
                 if(not self.exit.is_set()):
                     try:
                         if(not self.messageQueue.full()):
-                            self.messageQueue.put_nowait((color_image, hsv8))
+                            self.messageQueue.put_nowait((color_image, depth_image))
                     except:
                         pass
                     
