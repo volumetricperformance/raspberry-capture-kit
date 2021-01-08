@@ -11,12 +11,13 @@ import json
 import time
 import sys
 import platform
+import traceback
 import asyncio
 from timeit import default_timer as timer
 
-import multiprocessing.queues as mpq
 from multiprocessing import Process, Queue
 import multiprocessing as mp
+
 from gstreamer_sender import GStreamerSender
 
 from flask import Flask, Response, render_template, send_from_directory
@@ -27,27 +28,11 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 import traceback
 
-
-#workaround for running this on macos
-#https://stackoverflow.com/a/24941654
-#https://stackoverflow.com/q/39496554
-class XQueue(mpq.Queue):
-
-    def __init__(self,*args,**kwargs):
-        ctx = mp.get_context()
-        super(XQueue, self).__init__(*args, **kwargs, ctx=ctx)
-
-    def empty(self):
-        try:
-            return self.qsize() == 0
-        except NotImplementedError:  # OS X -- see qsize() implementation
-            return super(XQueue, self).empty()
-
 class RealsenseCapture (mp.Process):
 
-    def __init__(self, rtmp_uri, config_json, w, h, statusQueue, messageQueue, gststream):
+    def __init__(self, rtmp_uri, config_json, w, h, statusQueue, messageQueue):
         mp.Process.__init__(self)
-
+        self.name = "RL"
         self.exit = mp.Event()
         self.rtmp_url = rtmp_uri
         self.json_file = config_json
@@ -55,7 +40,6 @@ class RealsenseCapture (mp.Process):
         self.height = h
         self.statusQueue = statusQueue
         self.messageQueue = messageQueue
-        self.gststream = gststream
         self.rspipeline = None
         self.framecount = 0
 
@@ -107,8 +91,8 @@ class RealsenseCapture (mp.Process):
         # ========================
         self.rspipeline = rs.pipeline()
         config = rs.config()
-        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 30)
-        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 30)
+        config.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, 15)
+        config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, 15)
 
         # ======================
         # 2. Start the streaming
@@ -161,8 +145,8 @@ class RealsenseCapture (mp.Process):
                 # ======================================
                 # 7. Wait for a coherent pair of frames:
                 # ======================================
-                frames = self.rspipeline.wait_for_frames()
-
+                frames = self.rspipeline.wait_for_frames(1000)
+                
                 # =======================================
                 # 8. Align the depth frame to color frame
                 # =======================================
@@ -200,32 +184,35 @@ class RealsenseCapture (mp.Process):
                 # ==================================
                 # 11. Convert images to numpy arrays
                 # ==================================
-                depth_image = np.asanyarray(depth_frame.get_data()).astype( np.float32)
-                color_image = np.asanyarray(color_frame.get_data())
+                depth_image = np.asanyarray(depth_frame.as_frame().get_data()).astype( np.float32)
+                color_image = np.asanyarray(color_frame.as_frame().get_data())
                 
-                #print(str(timer() - waitFrameTime) + " rl frame time")
                 
                 if(not self.exit.is_set()):
                     try:
                         if(not self.messageQueue.full()):
-                            self.messageQueue.put_nowait((color_image, depth_image))
+                            frameTimer = timer()
+                            self.messageQueue.put((color_image, depth_image, str(frameTimer)))
+                            print("realsense frame: %s fps:%s" % (str(frameTimer), str(1/(frameTimer-start))) )
+                        else:
+                            print("messageQueue full")
+
                     except:
+                        print("messageQueue put exception")
                         pass
-                    
-                frameTimer = timer()
-                print("realsense frame: %s" % str(1/(frameTimer-start)))
+                
                 start = timer()
 
         except:        
-            e = sys.exc_info()[0]
-            print( "Unexpected Error: %s" % e )
-            self.statusQueue.put_nowait("ERROR: Realsense Unexpected Error: %s" % e)
-            self.exit.set()
+            type, value, tb = sys.exc_info()
+            print('Error opening %s: %s' % (type, value))
+            traceback.print_exception(type, value, tb,
+                                          None, sys.stderr)
 
         finally:
             # Stop streaming
             print( "Stop realsense pipeline" )
             self.rspipeline.stop()
         
-        self.statusQueue.put_nowait("INFO: Exiting Realsense process")
+        #self.statusQueue.put_nowait("INFO: Exiting Realsense process")
         print ("Exiting realsense process")

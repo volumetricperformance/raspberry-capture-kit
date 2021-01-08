@@ -90,14 +90,14 @@ def handle_start(url):
 
     print('start ', url, len(streams))
 
-    if len(streams) == 0:
+    if len(streams) == 0 and streaming == False:
         # Control parameters
         # =======================
         dir_path = os.path.dirname(os.path.realpath(__file__))
         json_file = dir_path + "/" + "MidResHighDensityPreset.json" # MidResHighDensityPreset.json / custom / MidResHighAccuracyPreset
 
-        gstMessager = GStreamerSender( url, 640, 480, statusQueue, messageQueue, previewQueue)
-        stream = RealsenseCapture( url, json_file, 640, 480, statusQueue, messageQueue, gstMessager )
+        gstMessager = GStreamerSender( url, 640, 480, statusQueue, previewQueue)
+        stream = RealsenseCapture( url, json_file, 640, 480, statusQueue, gstMessager.messageQueue )
         streaming = True        
         stream.start()
         streams.append(stream)
@@ -111,10 +111,32 @@ def handle_stop():
     global streaming
     
     print('Stop')
-    streaming = False
+    
     if len(streams) > 0:
-        streams[0].shutdown()
-        streams[1].shutdown()
+        for p in streams:
+            p.shutdown()
+
+        #because we have forked processes we need terminate them, they don't terminate of their own accord
+        #it takes a while for gstreamer to exit, so we have a timer here
+
+        #you can't start a stream while this is in process
+        TIMEOUT = 4
+        start = time.time()
+        while time.time() - start <= TIMEOUT:
+            if not any(p.is_alive() for p in streams):
+                # All the processes are done, break now.
+                break
+
+            time.sleep(.1)  # Just to avoid hogging the CPU
+        else:
+            # We only enter this if we didn't 'break' above.
+            print("timed out, killing all processes")
+            for p in streams:
+                p.terminate()
+                p.join()
+                
+        streams.clear()
+        streaming = False
 
 @app.route('/')
 def root():
@@ -242,8 +264,6 @@ def main():
     previewQueue = Queue(maxsize=3)
     #queue of status messages
     statusQueue = Queue(maxsize=1000)
-    #queue of gstreamer messages
-    messageQueue = Queue(maxsize=10)
 
     try:
         log = ''
@@ -301,14 +321,6 @@ def main():
                 try:
                     #TODO: need better way to keep streams updated / monitor when the process crashes/exits
                     #TODO: need thread locking around streams because another thread migh have broken it
-
-                    for stream in streams:
-                        if( not stream.is_alive()):
-                            print('clean up stream')
-                            stream.terminate()
-                            streams.remove(stream)
-                            preview[:] = (0,0,0)
-                            uiframe[:] = (50, 50, 50)  
 
                     if len(streams) > 0:                                            
                         #recording / red

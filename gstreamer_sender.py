@@ -18,13 +18,14 @@ gi.require_version('Gst', '1.0')
 from gi.repository import GObject, Gst
 
 class GStreamerSender(mp.Process):
-    def __init__(self, rtmp_url, width, height, statusQueue, messageQueue, previewQueue):
+    def __init__(self, rtmp_url, width, height, statusQueue, previewQueue):
         mp.Process.__init__(self)
+        self.name = "gst"
 
         self.rtmp_url = rtmp_url
         self.width = width
         self.height = height
-        self.messageQueue = messageQueue
+        self.messageQueue = Queue(maxsize=3)
         self.statusQueue = statusQueue
         self.previewQueue = previewQueue
         self.exit = mp.Event()
@@ -74,7 +75,6 @@ class GStreamerSender(mp.Process):
         self.appsrc.set_property('emit-signals',True) #tell sink to emit signals 
         self.gstpipe.set_state(Gst.State.PLAYING)
 
-        print("Starting message loop")
         buff = Gst.Buffer.new_allocate(None, self.width*self.height*3*2, None)
         buff_depth_index = (self.width*self.height*3)-1
         
@@ -83,6 +83,7 @@ class GStreamerSender(mp.Process):
         depth_hsv = np.zeros((self.height, self.width, 3), dtype=np.float32)
         depth_image = np.zeros((self.height, self.width, 3), dtype=np.float32)
 
+        print("Starting gstreamer loop")
         start = timer()
         try:
             while not self.exit.is_set():
@@ -90,6 +91,7 @@ class GStreamerSender(mp.Process):
                 result = self.last_message(self.messageQueue)
                 if result is None:
                     continue
+                    
                 framestart = timer()
                 
                 #color is nparray of rl color, depth is nparray of rl depth
@@ -146,7 +148,7 @@ class GStreamerSender(mp.Process):
                         pass
 
                 msgprocesstime = timer()
-                print("gstreamer frame: %s" % str(1/(msgprocesstime-start)))
+                print("gstreamer frame: %s now:%s fps:%s d:%s" % (result[2], str(msgprocesstime), str(1/(msgprocesstime-start)), str(framestart-start) ) )
                 start = timer()
         except:
             self.statusQueue.put_nowait("ERROR: gstreamer process frame")
@@ -155,13 +157,37 @@ class GStreamerSender(mp.Process):
         finally:
             self.appsrc.emit("end-of-stream")
 
-            print("Sending an EOS event to the pipeline")
-            self.gstpipe.send_event(Gst.Event.new_eos())
+            try:
+                print("Sending an EOS event to the pipeline")
+                self.gstpipe.send_event(Gst.Event.new_eos())
+            except:
+                print("error sending eos")
+                pass
+                
             print("Waiting for the EOS message on the bus")
-            self.bus.timed_pop_filtered(Gst.CLOCK_TIME_NONE, Gst.MessageType.EOS)
-            print("Stopping pipeline")
-            self.gstpipe.set_state(Gst.State.NULL) 
+            try:                
+                self.bus.timed_pop_filtered(Gst.CLOCK_TIME_NONE, Gst.MessageType.EOS)
+            except:
+                print("error waiting for eos")
+                pass
+                
+            try:
+                print("Stopping gstreamer pipeline")
+                self.gstpipe.set_state(Gst.State.NULL)
+            except:
+                print("error stopping pipeline for eos")
+                pass    
     
+        print("clear messageQueue")
+        try:
+            while( not self.messageQueue.empty() ):
+                print("messageQueue")
+                self.messageQueue.get()
+        except queue.Empty:
+            pass
+
+        self.messageQueue.close()
+        
         #self.statusQueue.put_nowait("INFO: Exiting gstreamer process")
         print ("Exiting gstreamer process")      
 
@@ -182,11 +208,11 @@ class GStreamerSender(mp.Process):
 
     def on_bus_message(self, message):
         t = message.type
-        """
+        
         print('{} {}: {}'.format(
                 Gst.MessageType.get_name(message.type), message.src.name,
                 message.get_structure().to_string()))
-        """
+        
         if t == Gst.MessageType.EOS:
             print("Eos")
             self.statusQueue.put_nowait('WARNING: End of Stream')
