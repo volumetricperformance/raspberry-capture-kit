@@ -11,6 +11,7 @@ import os
 import json
 import time
 import platform
+import atexit
 import asyncio
 import netifaces
 import requests
@@ -86,13 +87,13 @@ def handle_start(url):
 
     print('start ', url, len(streams))
 
-    if len(streams) == 0:
+    if len(streams) == 0 and streaming == False:
         # Control parameters
         # =======================
         dir_path = os.path.dirname(os.path.realpath(__file__))
         json_file = dir_path + "/" + "MidResHighDensityPreset.json" # MidResHighDensityPreset.json / custom / MidResHighAccuracyPreset
 
-        stream = RealsenseCapture( url, json_file, 640, 480, previewQueue,statusQueue )
+        stream = RealsenseCapture( url, json_file, 640, 480, previewQueue, statusQueue )
         streaming = True        
         stream.start()
         streams.append(stream)
@@ -104,10 +105,32 @@ def handle_stop():
     global streaming
     
     print('Stop')
-    streaming = False
+    
     if len(streams) > 0:
-        streams[0].shutdown()
-        streams.remove(streams[0])
+        for p in streams:
+            p.shutdown()
+
+        #because we have forked processes we need terminate them, they don't terminate of their own accord
+        #it takes a while for gstreamer to exit, so we have a timer here
+
+        #you can't start a stream while this is in process
+        TIMEOUT = 4
+        start = time.time()
+        while time.time() - start <= TIMEOUT:
+            if not any(p.is_alive() for p in streams):
+                # All the processes are done, break now.
+                break
+
+            time.sleep(.1)  # Just to avoid hogging the CPU
+        else:
+            # We only enter this if we didn't 'break' above.
+            print("timed out, killing all processes")
+            for p in streams:
+                p.terminate()
+                p.join()
+                
+        streams.clear()
+        streaming = False
 
 @app.route('/')
 def root():
@@ -115,11 +138,26 @@ def root():
     return app.send_static_file('index.html')
 
 #TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
+@app.route('/shutdown')
+def quit():
+    global running
+    print('/shutdown %s' % (running))
+
+    running = False
+
+    try:
+        socketio.stop()
+    except:
+        pass
+
+    return (' ', 200) 
+
+#TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
 @socketio.on('reboot')
 def handle_reboot():
     global running
     
-    print('Reboot')  
+    print('Reboot %s' % (running))
     running = False
     try:
         socketio.stop()
@@ -134,7 +172,7 @@ def handle_reboot():
 def handle_shutdown():
     global running
     
-    print('Shutdown')  
+    print('Shutdown %s' % (running))
     running = False
     try:
         socketio.stop()
@@ -143,18 +181,6 @@ def handle_shutdown():
 
     if platform.system() == "Linux":
         os.system('systemctl poweroff -i')        
-
-#TODO: Add some kind of security step here? Anybody on the local network can shut down hardware
-@app.route('/shutdown')
-def quit():
-    global running
-    running = False
-
-    print('Shutdown')
-    try:
-        socketio.stop()
-    except:
-        pass
   
 class WebSocketServer(object):
     def __init__(self):
@@ -166,30 +192,36 @@ class WebSocketServer(object):
     def start(self):
         self.thread = socketio.start_background_task(self.start_server)
        	socketio.start_background_task(self.send_status)
-    
+
     def send_status(self):
         
         global streams
         global running        
         
-        while (running==True):        
+        while (running==True):
             if( len(streams)>0):
                 try:
                     status = Status()
-                    while( status is not None ):
-                        print('status: %s' % (status) )
+                    if( status is not None ):
+                        #print('status: %s' % (status) )
                         status = Status()
                         socketio.emit("status", status)
                 except:
+                    print('WebSocketServer send_status status exception')
                     pass   
+            try:
+                socketio.sleep(0.01)
+            except:
+                print('WebSocketServer send_status sleep exception')
+                pass    
 
-            socketio.sleep(0.1)
+        print('Exit WebSocketServer')
 
 def Status():
     result = None
     try:
         if( not statusQueue.empty() ):
-            result = statusQueue.get()
+            result = statusQueue.get_nowait()
     except queue.Empty:
         pass
 
@@ -200,15 +232,18 @@ def LastPreview():
 
     try:
         while( not previewQueue.empty() ):
-            result = previewQueue.get()
+            (color,depth) = previewQueue.get_nowait()
     except queue.Empty:
         pass
 
+    #result = np.hstack((color,depth))
+    result = depth
     return result
 
 
 def main():
-    
+    GObject.threads_init()
+
     global streams
     global streaming
     global running
@@ -216,11 +251,12 @@ def main():
     global previewQueue
     global statusQueue
 
-    #queue of images
-    previewQueue = Queue()
-    #queue of status messages
-    statusQueue = SimpleQueue()
+    atexit.register(term_stream, streams)
 
+    #queue of images
+    previewQueue = Queue(maxsize=10)
+    #queue of status messages
+    statusQueue = Queue(maxsize=1000)
 
     try:
         log = ''
@@ -265,37 +301,38 @@ def main():
         uiframe = np.zeros((720, 1280, 3), np.uint8)      
         uiframe[:] = (50, 50, 50)  
 
-        preview = np.zeros((480, 1280, 3), np.uint8)
-
+        preview = np.zeros((480, 640, 3), np.uint8)
+        color = np.zeros((480, 640, 3), np.uint8)
+        depth = np.zeros((480, 640, 3), np.uint8)
+        server = WebSocketServer()
+        server.start()
+        
         if( running ):
-            server = WebSocketServer()
-            server.start()
+
             while(running == True):
             
                 try:
                     #TODO: need better way to keep streams updated / monitor when the process crashes/exits
                     #TODO: need thread locking around streams because another thread migh have broken it
 
-                    for stream in streams:
-                        if( not stream.is_alive()):
-                            streams.remove(stream)
-                            preview[:] = (0,0,0)
-                            uiframe[:] = (50, 50, 50)  
-
                     if len(streams) > 0:                                            
                         #recording / red
                         uiframe[:] = (50, 50, 175) 
-                        newpreview = LastPreview()
-                        if( newpreview is not None ):
-                            preview = newpreview
+                        depth[:] = (0,0,0)
+                        try:
+                            if not previewQueue.empty():
+                                (color,depth) = previewQueue.get(block=False)
+                        except queue.Empty:
+                            pass
                     else:
-                        preview[:] = (0,0,0)
+                        depth[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
                 except:
                     pass
     
                 y = 120
-                uiframe[y:y+480, 0:1280] = preview
+                uiframe[y:y+480, 320:640+320] = depth
+                #uiframe[y:y+480, 640:1280] = color
 
                 # Using cv2.putText() method 
                 uiframe = cv2.putText(uiframe, 'http://{0}:5000/'.format( hostip), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 255, 255) , 4, cv2.LINE_AA)
@@ -305,33 +342,43 @@ def main():
                 # Check if ESC key was pressed
                 if cv2.waitKey(1) == 27:
                     running = False
+                    break
 
-                socketio.sleep(0.1)
+                socketio.sleep(0.2)
 
         else:
                 uiframe[:] = (0, 165, 255)  
                 uiframe = cv2.putText(uiframe, log, (50,100), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 0) , 4, cv2.LINE_AA)
-
                 running = True
                 while(running == True):
                     cv2.imshow(WINDOW_NAME, uiframe) 
                     # Check if ESC key was pressed
                     if cv2.waitKey(1) == 27:
                         running = False
+
     finally:
         print('shutting down')  
 
         if len(streams) > 0:
             streaming = False
             print('shutdown stream')  
-            streams[0].shutdown()
-
+            for p in streams:
+                p.shutdown()
         try:
             shutdown_server = requests.get("http://localhost:5000/shutdown", data=None)
         except:
+            print('exception shutting down')  
             pass
+    
+    print('Done?')
 
+def term_stream(streams):
+    print('term_stream')  
+    if len(streams) > 0:
+        for p in streams:
+            p.terminate()
 
 if __name__ == '__main__':
-    multiprocessing.set_start_method('spawn')
+    multiprocessing.set_start_method('spawn')    
     main()
+    print('Done!')
