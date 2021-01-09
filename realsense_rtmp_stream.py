@@ -214,25 +214,32 @@ class RealsenseCapture (mp.Process):
             print( CLI )
             self.gstpipe=Gst.parse_launch(CLI)
 
-            appsrc=self.gstpipe.get_by_name("mysource")
-            appsrc.set_property('emit-signals',True) #tell sink to emit signals
+            self.appsrc=self.gstpipe.get_by_name("mysource")
+            self.appsrc.set_property('emit-signals',True) #tell sink to emit signals
 
             # Set up a pipeline bus watch to catch errors.
-            bus = self.gstpipe.get_bus()
-            bus.connect("message", self.on_bus_message)
+            self.bus = self.gstpipe.get_bus()
+            self.bus.connect("message", self.on_bus_message)
 
             self.gstpipe.set_state(Gst.State.PLAYING)
             intrinsics = True
+
+            buff = Gst.Buffer.new_allocate(None, self.width*self.height*3*2, None)
+            buff_depth_index = (self.width*self.height*3)-1
+
+            hsv = np.zeros((self.height, self.width, 3), dtype=np.float32)
+            hsv8 = np.zeros((self.height, self.width, 3), dtype=np.int8)
+            depth_hsv = np.zeros((self.height, self.width, 3), dtype=np.float32)
+            depth_image = np.zeros((self.height, self.width, 3), dtype=np.float32)
             
+            start = timer()
             while not self.exit.is_set():
                 # ======================================
                 # 7. Wait for a coherent pair of frames:
                 # ======================================
-                start = timer()
                 frames = self.rspipeline.wait_for_frames(1000)
-                #waitFrameTime = timer()
-                #print(str(waitFrameTime-start) + " Wait frame time")
-
+                framestart = timer()
+                
                 # =======================================
                 # 8. Align the depth frame to color frame
                 # =======================================
@@ -266,7 +273,7 @@ class RealsenseCapture (mp.Process):
                 # ==================================
                 # 11. Convert images to numpy arrays
                 # ==================================
-                depth_image = np.asanyarray(depth_frame.get_data())
+                depth_image = np.asanyarray(depth_frame.get_data()).astype( np.float32)
                 color_image = np.asanyarray(color_frame.get_data())
 
                 # ======================================================================
@@ -284,71 +291,47 @@ class RealsenseCapture (mp.Process):
 
                 # Now normalize using that far plane
                 # cv expects the H in degrees, not 0-1 :(
-                depth_image_norm = (depth_image * (360/4000)).astype( np.float32)
-
-                # Create 3 dimensional HSV array where H=depth, S=1, V=1
-                depth_hsv = np.concatenate([depth_image_norm[..., np.newaxis]]*3, axis=2)
-                #depth_hsv[:,:,0] = 1
+                depth_image *= (360/4000)
+                depth_hsv[:,:,0] = depth_image
                 depth_hsv[:,:,1] = 1
                 depth_hsv[:,:,2] = 1
-
-                discard = depth_image_norm == 0
+                discard = depth_image == 0
                 s = depth_hsv[:,:,1]
                 v = depth_hsv[:,:,2] 
                 s[ discard] = 0
                 v[ discard] = 0
 
                 # cv2.cvtColor to convert HSV to RGB
-                # problem is that cv2 expects hsv to 8bit (0-255)
-                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
+                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR_FULL)
+
+                # cv2 needs hsv to 8bit (0-255) to stack with the color image
                 hsv8 = (hsv*255).astype( np.uint8)
-
-                # Stack rgb and depth map images horizontally for visualisation only
-                images = np.vstack((color_image, hsv8))
-
-                # push to gstreamer
-                frame = images.tostring()
-                #start = timer()
-                buf = Gst.Buffer.new_allocate(None, len(frame), None)
-                #buffAllocationTime = timer()
-                #print(str(buffAllocationTime-start) + " buffer allocation time")
-                buf.fill(0,frame)
-                #start = timer()
-                appsrc.emit("push-buffer", buf)
-                #emitTime = timer()
-                #print(str(emitTime-start) + " push stream")
-
+                
+                buff.fill(0,color_image.tobytes())
+                buff.fill( buff_depth_index,hsv8.tobytes())
+                self.appsrc.emit("push-buffer", buff)
+                
                 #process any messages from gstreamer
-                #start = timer()
-                msg = bus.pop_filtered(
+                msg = self.bus.pop_filtered(
                     Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                 )
-                #msgprocesstime = timer()
-                #print(str(msgprocesstime-start) + " gstreamer process time")
-                #empty the message queue if there is one
-                #start = timer()
+                
                 while( msg ): 
                     self.on_bus_message(msg)
-                    msg = bus.pop_filtered(
+                    msg = self.bus.pop_filtered(
                         Gst.MessageType.ERROR | Gst.MessageType.WARNING | Gst.MessageType.EOS | Gst.MessageType.INFO | Gst.MessageType.STATE_CHANGED
                     )
 
-                #msgprocesstime = timer()
-                #print(str(msgprocesstime-start) + " gstreamer message queue time")
-                #preview side by side because of landscape orientation of the pi 
-
-                #if we don't check for exit here the shutdown process hangs here
-                #start = timer()
                 if(not self.exit.is_set()):
                     try:
                         if(not self.previewQueue.full()):
-                            self.previewQueue.put_nowait(np.hstack((color_image, hsv8)))
+                            self.previewQueue.put_nowait( (color_image,hsv8) )
                     except:
                         pass
 
-                opencvWindowTimer = timer()
-                
-                #print(str(opencvWindowTimer - start) + " opencv window time")
+                msgprocesstime = timer()
+                print("gstreamer fps:%s d:%s" % ( str(1/(msgprocesstime-start)), str(framestart-start) ) )
+                start = timer()
 
         except:        
             e = sys.exc_info()[0]
