@@ -291,7 +291,7 @@ class RealsenseCapture (mp.Process):
 
                 # Now normalize using that far plane
                 # cv expects the H in degrees, not 0-1 :(
-                depth_image *= (360/4000)
+                depth_image *= (180/4000)
                 depth_hsv[:,:,0] = depth_image
                 depth_hsv[:,:,1] = 1
                 depth_hsv[:,:,2] = 1
@@ -302,7 +302,7 @@ class RealsenseCapture (mp.Process):
                 v[ discard] = 0
 
                 # cv2.cvtColor to convert HSV to RGB
-                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR_FULL)
+                hsv = cv2.cvtColor(depth_hsv, cv2.COLOR_HSV2BGR)
 
                 # cv2 needs hsv to 8bit (0-255) to stack with the color image
                 hsv8 = (hsv*255).astype( np.uint8)

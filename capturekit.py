@@ -240,6 +240,22 @@ def LastPreview():
     result = depth
     return result
 
+def ClearConnections():
+    os.system('rm -rf /etc/NetworkManager/system-connections/*')
+
+# function that handles the mousclicks
+# https://stackoverflow.com/a/55922653
+def processClick(event, x, y,flags, params):
+    global streaming
+    if streaming == True:
+        return
+    # check if the click is within the dimensions of the button
+    if event == cv2.EVENT_LBUTTONDOWN:
+        #print("x: " + str(x) + " y: " + str(y))
+        # Dimensions of the clear connections text (0, 640) (470, 720)
+        if y > 630 and y < 720 and x > 0 and x < 470:   
+            ClearConnections()
+            print('Cleared connections')
 
 def main():
     GObject.threads_init()
@@ -299,13 +315,16 @@ def main():
         cv2.moveWindow(WINDOW_NAME, 0, 0)
 
         uiframe = np.zeros((720, 1280, 3), np.uint8)      
-        uiframe[:] = (50, 50, 50)  
+        uiframe[:] = (50, 50, 50)
 
         preview = np.zeros((480, 640, 3), np.uint8)
         color = np.zeros((480, 640, 3), np.uint8)
         depth = np.zeros((480, 640, 3), np.uint8)
         server = WebSocketServer()
         server.start()
+
+        cv2.setMouseCallback(WINDOW_NAME, processClick)
+
         
         if( running ):
 
@@ -327,6 +346,7 @@ def main():
                     else:
                         depth[:] = (0,0,0)
                         uiframe[:] = (50, 50, 50)  
+                        uiframe[630:700, 10:460] = (20,20,20)
                 except:
                     pass
     
@@ -337,7 +357,14 @@ def main():
                 # Using cv2.putText() method 
                 uiframe = cv2.putText(uiframe, 'http://{0}:5000/'.format( hostip), (50,100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (255, 255, 255) , 4, cv2.LINE_AA)
 
-                cv2.imshow(WINDOW_NAME, uiframe) 
+                # Add the clear connections button to the bottom of the screen
+                if streaming == False:
+                    uiframe = cv2.putText(uiframe, 'Clear Connections', (20,680), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 2, cv2.LINE_AA)
+                cv2.imshow(WINDOW_NAME, uiframe)
+
+                if cv2.waitKey(1) == 99:
+                    ClearConnections()
+                    print("cleared connections")
                 
                 # Check if ESC key was pressed
                 if cv2.waitKey(1) == 27:
