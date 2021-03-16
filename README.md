@@ -1,6 +1,6 @@
 # Realsense to RTMP streaming pipeline
 
-This program can run on MacOS/Ubuntu/Raspbian. Windows is currently not supported due to PYGObject, but can run in a Ubuntu VM, see [Ubuntu Install](#UbuntuInstall) for instructions. Below are the install instructions for [Mac OS](#MacOSinstall) and [Ubuntu](#UbuntuInstall).
+This program can run on MacOS/Ubuntu/Raspbian. Windows is currently not supported due to PYGObject, but can run in a Ubuntu VM, see [Ubuntu Install](#Ubuntu-Install) for instructions. Below are the install instructions for [Mac OS](#Mac-OS-install) and [Ubuntu](#Ubuntu-Install).
 
 ### To install realsense SDK on a raspberry pi:
 
