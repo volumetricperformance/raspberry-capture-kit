@@ -1,7 +1,6 @@
-# Realsense to Twitch RTMP streaming pipeline
+# Realsense to RTMP streaming pipeline
 
-make sure there is an environment variable on your machine for Twitch streaming key called TWITCH_KEY.
-
+This program can run on MacOS/Ubuntu/Raspbian. Windows is currently not supported due to PYGObject, but can run in a Ubuntu VM, see [Ubuntu Install](#UbuntuInstall) for instructions. Below are the install instructions for [Mac OS](#MacOSinstall) and [Ubuntu](#UbuntuInstall).
 
 ### To install realsense SDK on a raspberry pi:
 
@@ -42,7 +41,7 @@ xcode-select --install
 ```
 
 ## Installing Intel Realsense
-Follow the guide on Intel Realsene's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the cmake command, instead use the command below to build realsense for Python 3.6.8.
+Follow the guide on Intel Realsene's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4), instead use the command below to build realsense for Python 3.6.8.
 ```
 sudo cmake .. \
 -DBUILD_EXAMPLES=false \
@@ -69,11 +68,11 @@ pip install -r requirements-macos.txt
 ```
 
 ## Installing OpenCV
-Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtualenvironment
+Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment. Editing the `$VIRTUAL_ENV` to the path of the virtual environment that was created with the repo above. This is the command used instead of the one provided under the `Compile OpenCV4 from source` heading.
 ```
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D CMAKE_INSTALL_PREFIX=/usr/local \
--D OPENCV_EXTRA_MODULES_PATH=~/dev/opencv_contrib/modules \
+-D OPENCV_EXTRA_MODULES_PATH=path/to/opencv_contrib/modules \
 -D PYTHON3_LIBRARY=`python -c 'import subprocess ; import sys ; s = subprocess.check_output("python-config --configdir", shell=True).decode("utf-8").strip() ; (M, m) = sys.version_info[:2] ; print("{}/libpython{}.{}.dylib".format(s, M, m))'` \
 -D PYTHON3_INCLUDE_DIR=`python -c 'import distutils.sysconfig as s; print(s.get_python_inc())'` \
 -D PYTHON3_EXECUTABLE=$VIRTUAL_ENV/bin/python \
@@ -119,7 +118,7 @@ While running the `sudo make test` command, there will be 3 errors `test_httplib
 Type in this command `sudo ln /opt/python3.6.8/bin/python3.6 /usr/local/bin/python3.6` to make it easier to run python3.6 from the terminal
 
 ## Install Realsense
-Follow the Intel Realsense [guide](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) up intil the cmake step. Instead replace that step with:
+Follow the Intel Realsense [guide](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) up intil the cmake step (Step 4). Instead replace that step with:
 ```
 sudo cmake .. -DBUILD_EXAMPLES=false \
 -DBUILD_GRAPHICAL_EXAMPLES=false \
