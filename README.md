@@ -72,14 +72,17 @@ pip install -r requirements-macos.txt
 ```
 
 ## Installing OpenCV
-Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment you just created. Edit the path following `$VIRTUAL_ENV` to be the path of the virtual environment that you created with the repo above. Use this command instead of the one provided in the guide under the `Compile OpenCV4 from source` heading in "Step #5: Compile OpenCV 4 for macOS."
+Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment you just created. 
+
+Use the command below instead of the one provided in the guide under the `Compile OpenCV4 from source` heading in `Step #5: Compile OpenCV 4 for macOS`. Edit the `/PATH/TO/` text below to match your local directories. Make sure to fill out the `PYTHON3_EXECUTABLE` path properly with for your virtual environment, i.e. `/PATH/TO/raspberry-capture-kit/env/bin/python` rather than your global python. Otherwise openCV will not find the proper python version.
+
 ```
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D CMAKE_INSTALL_PREFIX=/usr/local \
--D OPENCV_EXTRA_MODULES_PATH=path/to/opencv_contrib/modules \
+-D OPENCV_EXTRA_MODULES_PATH=/PATH/TO/opencv_contrib/modules \
 -D PYTHON3_LIBRARY=`python -c 'import subprocess ; import sys ; s = subprocess.check_output("python-config --configdir", shell=True).decode("utf-8").strip() ; (M, m) = sys.version_info[:2] ; print("{}/libpython{}.{}.dylib".format(s, M, m))'` \
 -D PYTHON3_INCLUDE_DIR=`python -c 'import distutils.sysconfig as s; print(s.get_python_inc())'` \
--D PYTHON3_EXECUTABLE=$VIRTUAL_ENV/bin/python \
+-D PYTHON3_EXECUTABLE=/PATH/TO/bin/python \
 -D BUILD_opencv_python2=OFF \
 -D BUILD_opencv_python3=ON \
 -D INSTALL_PYTHON_EXAMPLES=ON \
@@ -87,7 +90,7 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D OPENCV_ENABLE_NONFREE=OFF \
 -D BUILD_EXAMPLES=ON ..
 ```
-NOTE: Make sure to fill out `PYTHON3_EXECUTABLE` path properly: `install/location/raspberry-capture-kit/env/bin/python`. Otherwise it will not install opencv properly.
+
 
 ## Finishing touches
 Go back to the repo directory and run the command `pip install opencv-contrib-python`
