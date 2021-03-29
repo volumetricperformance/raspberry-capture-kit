@@ -61,7 +61,7 @@ cd raspberry-capture-kit
 git fetch
 git checkout release
 ```
-Continue from here with the two file paths you noted in the previous step
+Continue from here with the two file paths you noted in the previous step.
 ```
 cp /PATH/TO/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so pyrealsense2.so
 cp /PATH/TO/site-packages/pyrealsense2/pybackend2.cpython-36m-darwin.so pybackend2.so
@@ -72,7 +72,7 @@ pip install -r requirements-macos.txt
 ```
 
 ## Installing OpenCV
-Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment. Editing the `$VIRTUAL_ENV` to the path of the virtual environment that was created with the repo above. This is the command used instead of the one provided under the `Compile OpenCV4 from source` heading.
+Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment you just created. Edit the path following `$VIRTUAL_ENV` to be the path of the virtual environment that you created with the repo above. Use this command instead of the one provided in the guide under the `Compile OpenCV4 from source` heading in "Step #5: Compile OpenCV 4 for macOS."
 ```
 cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -87,7 +87,7 @@ cmake -D CMAKE_BUILD_TYPE=RELEASE \
 -D OPENCV_ENABLE_NONFREE=OFF \
 -D BUILD_EXAMPLES=ON ..
 ```
-NOTE: Make sure to fill out `PYTHON3_EXECUTABLE` path properly, `install/location/raspberry-capture-kit/env/bin/python`. Otherwise it will not install opencv properly.
+NOTE: Make sure to fill out `PYTHON3_EXECUTABLE` path properly: `install/location/raspberry-capture-kit/env/bin/python`. Otherwise it will not install opencv properly.
 
 ## Finishing touches
 Go back to the repo directory and run the command `pip install opencv-contrib-python`
