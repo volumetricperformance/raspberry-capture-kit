@@ -52,15 +52,19 @@ sudo cmake .. \
 sudo make -j2
 sudo make install
 ```
+After `sudo make install` has finished, note the paths to the files `pyrealsense2.cpython-36m-darwin.so` and `pybackend2.cpython-36m-darwin.so` in your terminal window's output. These may look something like `/Library/Python/3.8/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so`. You'll need these paths in the next section.
 
 ## Setting up the repo
 ```
-git clone git@github.com:volumetricperformance/raspberry-capture-kit.git
+git clone https://github.com/volumetricperformance/raspberry-capture-kit.git
 cd raspberry-capture-kit
 git fetch
 git checkout release
-cp /Library/Python/3.8/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so pyrealsense2.so
-cp /Library/Python/3.8/site-packages/pyrealsense2/pybackend2.cpython-36m-darwin.so pybackend2.so
+```
+Continue from here with the two file paths you noted in the previous step
+```
+cp /PATH/TO/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so pyrealsense2.so
+cp /PATH/TO/site-packages/pyrealsense2/pybackend2.cpython-36m-darwin.so pybackend2.so
 python3.6 -m pip install virtualenv
 python3.6 -m virtualenv env
 source env/bin/activate
