@@ -27,9 +27,11 @@ https://www.amazon.com/gp/product/B07WQW6H9S
 # Mac OS install
 Install homebrew, follow the steps from [here](https://brew.sh/). Make sure that xcode is installed and up to date before proceeding.
 
-Install [Python 3.6.8](https://www.python.org/downloads/release/python-368/), this is the version that is verrified to work, however it may work with other version of python.
+Install [Python 3.6.8](https://www.python.org/downloads/release/python-368/). This is the version that is verified to work, but it may work with other version of Python.
 
-Install PyGObject, follow the steps from [here](https://pygobject.readthedocs.io/en/latest/getting_started.html), brew might be able to install it as well `brew install pygobject3 gtk+3`
+## Install PyGObject and dependencies
+
+Install PyGObject by following the steps [here](https://pygobject.readthedocs.io/en/latest/getting_started.html). If you're using a Python version manager like pyenv, follow the instructions [here](We recommend following the instructions to create a development environment with PyGObject to make it easier to work with Python 3.6.8: [https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html) next. Homebrew might be able to install it as well with `brew install pygobject3 gtk+3`.
 
 Install dependencies for building both realsense and opencv:
 ```
@@ -40,8 +42,10 @@ brew install --cask apenngrace/vulkan/vulkan-sdk
 xcode-select --install
 ```
 
-## Installing Intel Realsense
-Follow the guide on Intel Realsene's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4), instead use the command below to build realsense for Python 3.6.8.
+## Installing Intel Realsense SDK
+Download librealsense: `git clone https://github.com/IntelRealSense/librealsense.git`
+
+Follow the guide on Intel Realsense's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4). Use the command below instead to build realsense for Python 3.6.8.
 ```
 sudo cmake .. \
 -DBUILD_EXAMPLES=false \
@@ -52,9 +56,9 @@ sudo cmake .. \
 sudo make -j2
 sudo make install
 ```
-After `sudo make install` has finished, note the paths to the files `pyrealsense2.cpython-36m-darwin.so` and `pybackend2.cpython-36m-darwin.so` in your terminal window's output. These may look something like `/Library/Python/3.8/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so`. You'll need these paths in the next section.
+After `sudo make install` has finished, note the paths to the files `pyrealsense2.cpython-36m-darwin.so` and `pybackend2.cpython-36m-darwin.so` in your terminal window's output. These may look something like `/Library/Python/3.8/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so`. You will need these paths in the next section.
 
-## Setting up the repo
+## Setting up the raspberry-capture-kit repo
 ```
 git clone https://github.com/volumetricperformance/raspberry-capture-kit.git
 cd raspberry-capture-kit
@@ -72,30 +76,10 @@ pip install -r requirements-macos.txt
 ```
 
 ## Installing OpenCV
-Follow the guide [here](https://www.pyimagesearch.com/2018/08/17/install-opencv-4-on-macos/) to install opencv until the cmake command again if you want to install it only for the virtual environment you just created. 
-
-Use the command below instead of the one provided in the guide under the `Compile OpenCV4 from source` heading in `Step #5: Compile OpenCV 4 for macOS`. Edit the `/PATH/TO/` text below to match your local directories. Make sure to fill out the `PYTHON3_EXECUTABLE` path properly with for your virtual environment, i.e. `/PATH/TO/raspberry-capture-kit/env/bin/python` rather than your global python. Otherwise openCV will not find the proper python version.
-
-```
-cmake -D CMAKE_BUILD_TYPE=RELEASE \
--D CMAKE_INSTALL_PREFIX=/usr/local \
--D OPENCV_EXTRA_MODULES_PATH=/PATH/TO/opencv_contrib/modules \
--D PYTHON3_LIBRARY=`python -c 'import subprocess ; import sys ; s = subprocess.check_output("python-config --configdir", shell=True).decode("utf-8").strip() ; (M, m) = sys.version_info[:2] ; print("{}/libpython{}.{}.dylib".format(s, M, m))'` \
--D PYTHON3_INCLUDE_DIR=`python -c 'import distutils.sysconfig as s; print(s.get_python_inc())'` \
--D PYTHON3_EXECUTABLE=/PATH/TO/bin/python \
--D BUILD_opencv_python2=OFF \
--D BUILD_opencv_python3=ON \
--D INSTALL_PYTHON_EXAMPLES=ON \
--D INSTALL_C_EXAMPLES=OFF \
--D OPENCV_ENABLE_NONFREE=OFF \
--D BUILD_EXAMPLES=ON ..
-```
-
+With the virtual environment active in the repo directory cloned in the previous section, run the command `pip install opencv-contrib-python`.
 
 ## Finishing touches
-Go back to the repo directory and run the command `pip install opencv-contrib-python`
-
-Test to make sure the Intel Realsense and OpenCV Libraries are working properly by starting the `realsense-hsv-viewer.py` program. It should open a window and show a preview of the Realsense camera.
+Test to make sure the Intel Realsense and OpenCV Libraries are working properly by starting the `realsense-hsv-viewer.py` program with the camera connected. It should open a window and show a preview of the Realsense camera.
 
 # Ubuntu Install
 This was tested and verrified on Ubuntu 20.04 LTS, but should work on many Ubuntu versions. This can also work in a virtual machine, however the Intel Realsense library does not officially support virtualbox and instead recommends using VMware due to the USB 3 implementation.
@@ -137,7 +121,7 @@ sudo make install
 
 ## Clone the repo
 ```
-git clone git@github.com:volumetricperformance/raspberry-capture-kit.git
+git clone https://github.com/volumetricperformance/raspberry-capture-kit.git
 cd raspberry-capture-kit
 git fetch
 git checkout release
@@ -150,6 +134,13 @@ pip install -r requirements-macos.txt
 ```
 
 ## Finishing Touches
-Test to make sure the Intel Realsense and OpenCV Libraries are working properly by starting the `realsense-hsv-viewer.py` program. It should open a window and show a preview of the Realsense camera.
+Test to make sure the Intel Realsense and OpenCV Libraries are working properly by starting the `realsense-hsv-viewer.py` program with the camera connected. It should open a window and show a preview of the Realsense camera.
 
-In order to run the main `capture.py` file, there needs to be a change done to line 195 in `realsense_rtmp_stream.py` changine `omxh264enc` to `x264enc`
+In order to run the main `capture.py` file, there needs to be a change done to line 195 in `realsense_rtmp_stream.py`. Change `omxh264enc` to `x264enc`.
+
+# Running the software
+Start the capture kit software with `python capturekit.py`.
+
+The terminal will show an address similar to this: `Running on http://0.0.0.0:5000`
+
+Point a web browser this address and follow the instructions in [this article](https://medium.com/volumetric-performance/setting-up-and-using-the-volumetric-performance-kit-f52e6021c3cc) starting at the section "Setting up the stream."
