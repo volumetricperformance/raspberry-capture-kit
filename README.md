@@ -31,7 +31,7 @@ Install [Python 3.6.8](https://www.python.org/downloads/release/python-368/). Th
 
 ## Install PyGObject and dependencies
 
-Install PyGObject by following the steps [here](https://pygobject.readthedocs.io/en/latest/getting_started.html). If you're using a Python version manager like pyenv, follow the instructions [here](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html)We recommend following the instructions to create a development environment with PyGObject to make it easier to work with Python 3.6.8: [https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html) next. Homebrew might be able to install it as well with `brew install pygobject3 gtk+3`.
+Install PyGObject by following the steps [here](https://pygobject.readthedocs.io/en/latest/getting_started.html). If you're using a Python version manager like pyenv, follow the instructions [here](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html). We recommend following the instructions to create a development environment with PyGObject to make it easier to work with Python 3.6.8: [https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html) next. Homebrew might be able to install it as well with `brew install pygobject3 gtk+3`.
 
 Install dependencies for building both realsense and opencv:
 ```
