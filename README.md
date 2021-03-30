@@ -42,7 +42,7 @@ brew install --cask apenngrace/vulkan/vulkan-sdk
 xcode-select --install
 ```
 
-## Installing Intel Realsense SDK
+## Install Intel Realsense SDK
 Download librealsense: `git clone https://github.com/IntelRealSense/librealsense.git`
 
 Follow the guide on Intel Realsense's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4). Use the command below instead to build realsense for Python 3.6.8.
@@ -58,7 +58,7 @@ sudo make install
 ```
 After `sudo make install` has finished, note the paths to the files `pyrealsense2.cpython-36m-darwin.so` and `pybackend2.cpython-36m-darwin.so` in your terminal window's output. These may look something like `/Library/Python/3.8/site-packages/pyrealsense2/pyrealsense2.cpython-36m-darwin.so`. You will need these paths in the next section.
 
-## Setting up the raspberry-capture-kit repo
+## Clone the raspberry-capture-kit repo
 ```
 git clone https://github.com/volumetricperformance/raspberry-capture-kit.git
 cd raspberry-capture-kit
@@ -75,14 +75,14 @@ source env/bin/activate
 pip install -r requirements-macos.txt
 ```
 
-## Installing OpenCV
+## Install OpenCV
 With the virtual environment active in the repo directory cloned in the previous section, run the command `pip install opencv-contrib-python`.
 
 ## Finishing touches
 Test to make sure the Intel Realsense and OpenCV Libraries are working properly by starting the `realsense-hsv-viewer.py` program with the camera connected. It should open a window and show a preview of the Realsense camera.
 
 # Ubuntu Install
-This was tested and verrified on Ubuntu 20.04 LTS, but should work on many Ubuntu versions. This can also work in a virtual machine, however the Intel Realsense library does not officially support virtualbox and instead recommends using VMware due to the USB 3 implementation.
+This was tested and verified on Ubuntu 20.04 LTS, but should work on many Ubuntu versions. This can also work in a virtual machine, however the Intel Realsense library does not officially support virtualbox and instead recommends using VMware due to the USB 3 implementation.
 
 ## Install dependencies
 ```
@@ -94,7 +94,7 @@ sudo apt-get install libgstreamer1.0-0 gstreamer1.0-plugins-base gstreamer1.0-pl
 ```
 
 ## Install Python3.6.8
-Loosely following the guide [here](https://qiita.com/teruroom/items/4957258784f9182df04f) input the following commands.
+Loosely following the guide [here](https://qiita.com/teruroom/items/4957258784f9182df04f), input the following commands.
 ```
 wget https://www.python.org/ftp/python/3.6.8/Python-3.6.8.tgz
 tar xf Python-3.6.8.tgz
@@ -106,10 +106,10 @@ sudo make install
 ```
 While running the `sudo make test` command, there will be 3 errors `test_httplib test_nntplib test_ssl`. Everything will still work as intended regardless.
 
-Type in this command `sudo ln /opt/python3.6.8/bin/python3.6 /usr/local/bin/python3.6` to make it easier to run python3.6 from the terminal
+Type in this command `sudo ln /opt/python3.6.8/bin/python3.6 /usr/local/bin/python3.6` to make it easier to run python3.6 from the terminal.
 
 ## Install Realsense
-Follow the Intel Realsense [guide](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) up intil the cmake step (Step 4). Instead replace that step with:
+Follow the Intel Realsense [guide](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md) up intil the cmake step (Step 4). Instead, replace that step with:
 ```
 sudo cmake .. -DBUILD_EXAMPLES=false \
 -DBUILD_GRAPHICAL_EXAMPLES=false \
@@ -119,7 +119,7 @@ sudo make -j2
 sudo make install
 ```
 
-## Clone the repo
+## Clone the raspberry-capture-kit repo
 ```
 git clone https://github.com/volumetricperformance/raspberry-capture-kit.git
 cd raspberry-capture-kit
