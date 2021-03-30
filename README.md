@@ -27,11 +27,11 @@ https://www.amazon.com/gp/product/B07WQW6H9S
 # Mac OS install
 Install homebrew, follow the steps from [here](https://brew.sh/). Make sure that xcode is installed and up to date before proceeding.
 
-Install [Python 3.6.8](https://www.python.org/downloads/release/python-368/). This is the version that is verified to work, but it may work with other version of Python.
+Install [Python 3.6.8](https://www.python.org/downloads/release/python-368/). This is the version that is verified to work, but it may work with other versions of Python.
 
 ## Install PyGObject and dependencies
 
-Install PyGObject by following the steps [here](https://pygobject.readthedocs.io/en/latest/getting_started.html). If you're using a Python version manager like pyenv, follow the instructions [here](We recommend following the instructions to create a development environment with PyGObject to make it easier to work with Python 3.6.8: [https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html) next. Homebrew might be able to install it as well with `brew install pygobject3 gtk+3`.
+Install PyGObject by following the steps [here](https://pygobject.readthedocs.io/en/latest/getting_started.html). If you're using a Python version manager like pyenv, follow the instructions [here](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html)We recommend following the instructions to create a development environment with PyGObject to make it easier to work with Python 3.6.8: [https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html](https://pygobject.readthedocs.io/en/latest/devguide/dev_environ.html) next. Homebrew might be able to install it as well with `brew install pygobject3 gtk+3`.
 
 Install dependencies for building both realsense and opencv:
 ```
@@ -45,7 +45,7 @@ xcode-select --install
 ## Install Intel Realsense SDK
 Download librealsense: `git clone https://github.com/IntelRealSense/librealsense.git`
 
-Follow the guide on Intel Realsense's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4). Use the command below instead to build realsense for Python 3.6.8.
+Follow the guide on Intel Realsense's [github](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation_osx.md) up until the final cmake command (Step 4). Use the command below instead to build realsense for Python 3.6.8. If you're using a virtual environment or a different version of Python, be sure to edit `-DPYTHON_EXECUTABLE` to match the path to the correct version of python.
 ```
 sudo cmake .. \
 -DBUILD_EXAMPLES=false \
